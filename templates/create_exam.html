@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="mb-0">إنشاء اختبار جديد</h2>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('create_exam') }}" id="examForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="title" class="form-label">عنوان الاختبار</label>
+                                <input type="text" class="form-control" id="title" name="title" required>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="duration" class="form-label">مدة الاختبار (بالدقائق)</label>
+                                <input type="number" class="form-control" id="duration" name="duration" min="1" value="60" required>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="description" class="form-label">وصف الاختبار</label>
+                            <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
+                        </div>
+
+                        <div id="questions-container">
+                            <!-- Questions will be added here dynamically -->
+                        </div>
+
+                        <div class="mb-4">
+                            <button type="button" class="btn btn-secondary" onclick="addQuestion()">
+                                <i class="fas fa-plus"></i> إضافة سؤال
+                            </button>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save"></i> حفظ الاختبار
+                            </button>
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> إلغاء
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<template id="question-template">
+    <div class="question-item card mb-4">
+        <div class="card-header bg-light">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">سؤال جديد</h5>
+                <button type="button" class="btn btn-danger btn-sm" onclick="removeQuestion(this)">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8 mb-3">
+                    <label class="form-label">نص السؤال</label>
+                    <textarea class="form-control" name="question_text[]" rows="2" required></textarea>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">نوع السؤال</label>
+                        <select class="form-select" name="question_type[]" onchange="toggleOptions(this)">
+                            <option value="multiple_choice">اختيار من متعدد</option>
+                            <option value="true_false">صح/خطأ</option>
+                            <option value="essay">مقالي</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">الدرجة</label>
+                        <input type="number" class="form-control" name="points[]" min="1" value="1" required>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="options-container">
+                <div class="mb-3">
+                    <label class="form-label">الخيارات</label>
+                    <div class="options-list">
+                        <div class="row mb-2">
+                            <div class="col">
+                                <input type="text" class="form-control" name="options[]" placeholder="الخيار 1" required>
+                            </div>
+                            <div class="col-auto">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="correct_answer_temp" value="0" required>
+                                    <label class="form-check-label">صحيح</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col">
+                                <input type="text" class="form-control" name="options[]" placeholder="الخيار 2" required>
+                            </div>
+                            <div class="col-auto">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="correct_answer_temp" value="1">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col">
+                                <input type="text" class="form-control" name="options[]" placeholder="الخيار 3" required>
+                            </div>
+                            <div class="col-auto">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="correct_answer_temp" value="2">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col">
+                                <input type="text" class="form-control" name="options[]" placeholder="الخيار 4" required>
+                            </div>
+                            <div class="col-auto">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="correct_answer_temp" value="3">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Hidden input to store the actual correct answer -->
+                <input type="hidden" name="correct_answer[]" value="0">
+            </div>
+        </div>
+    </div>
+</template>
+
+<style>
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0,0,0,.125);
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13,110,253,.25);
+}
+
+.btn-lg {
+    padding: 0.75rem 1.5rem;
+}
+
+.options-list .row:hover {
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+}
+
+.form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+</style>
+
+<script>
+let questionCounter = 0;
+
+function addQuestion() {
+    const container = document.getElementById('questions-container');
+    const template = document.getElementById('question-template');
+    const clone = template.content.cloneNode(true);
+    
+    // Update the question counter
+    questionCounter++;
+    const questionItem = clone.querySelector('.question-item');
+    const questionHeader = questionItem.querySelector('h5');
+    questionHeader.textContent = `السؤال ${questionCounter}`;
+    
+    // Fix the radio button names to be unique for this question
+    const radioButtons = clone.querySelectorAll('input[type="radio"]');
+    radioButtons.forEach(radio => {
+        radio.name = `correct_answer_temp_${questionCounter}`;
+        radio.addEventListener('change', updateCorrectAnswer);
+    });
+    
+    container.appendChild(clone);
+    toggleOptions(questionItem.querySelector('select'));
+}
+
+function removeQuestion(button) {
+    const questionItem = button.closest('.question-item');
+    questionItem.remove();
+    
+    // Update the question numbers
+    const questions = document.querySelectorAll('.question-item');
+    questions.forEach((q, index) => {
+        const header = q.querySelector('h5');
+        header.textContent = `السؤال ${index + 1}`;
+    });
+    questionCounter = questions.length;
+}
+
+function toggleOptions(select) {
+    const questionItem = select.closest('.question-item');
+    const optionsContainer = questionItem.querySelector('.options-container');
+    const optionInputs = questionItem.querySelectorAll('input[name="options[]"]');
+    const radioButtons = questionItem.querySelectorAll('input[type="radio"]');
+    const correctAnswerInput = questionItem.querySelector('input[name="correct_answer[]"]');
+    
+    if (select.value === 'multiple_choice') {
+        optionsContainer.style.display = 'block';
+        optionInputs.forEach(input => {
+            input.required = true;
+            input.closest('.row').style.display = '';
+        });
+    } else if (select.value === 'true_false') {
+        optionsContainer.style.display = 'block';
+        optionInputs[0].value = 'صح';
+        optionInputs[1].value = 'خطأ';
+        optionInputs[0].required = true;
+        optionInputs[1].required = true;
+        
+        // Hide options 3 and 4
+        optionInputs[2].closest('.row').style.display = 'none';
+        optionInputs[3].closest('.row').style.display = 'none';
+        optionInputs[2].required = false;
+        optionInputs[3].required = false;
+        
+        // Reset radio selection
+        radioButtons[0].checked = true;
+        correctAnswerInput.value = "0";
+    } else {
+        optionsContainer.style.display = 'none';
+        optionInputs.forEach(input => {
+            input.required = false;
+        });
+        correctAnswerInput.value = "0";
+    }
+}
+
+function updateCorrectAnswer(event) {
+    const questionItem = event.target.closest('.question-item');
+    const correctAnswerInput = questionItem.querySelector('input[name="correct_answer[]"]');
+    correctAnswerInput.value = event.target.value;
+}
+
+// Form validation before submission
+document.getElementById('examForm').addEventListener('submit', function(e) {
+    const questions = document.querySelectorAll('.question-item');
+    if (questions.length === 0) {
+        e.preventDefault();
+        alert('يجب إضافة سؤال واحد على الأقل');
+        return;
+    }
+    
+    // Validate each question
+    questions.forEach(question => {
+        const type = question.querySelector('select[name="question_type[]"]').value;
+        if (type === 'multiple_choice' || type === 'true_false') {
+            const radioButtons = question.querySelectorAll('input[type="radio"]');
+            const checked = Array.from(radioButtons).some(radio => radio.checked);
+            if (!checked) {
+                e.preventDefault();
+                alert('يجب تحديد الإجابة الصحيحة لكل سؤال');
+                return;
+            }
+        }
+    });
+});
+
+// Add initial question
+document.addEventListener('DOMContentLoaded', function() {
+    addQuestion();
+});
+</script>
+{% endblock %}

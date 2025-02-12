@@ -1,0 +1,387 @@
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
+from flask_wtf.csrf import CSRFProtect
+import os
+import logging
+from xml_database import XMLDatabase
+from sqlalchemy import text
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.urandom(24)
+csrf = CSRFProtect(app)
+
+# Initialize XML Database
+db = XMLDatabase()
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
+
+class User(UserMixin):
+    def __init__(self, user_data):
+        self.id = user_data['id']
+        self.username = user_data['username']
+        self.email = user_data['email']
+        self.password_hash = user_data['password_hash']
+        self.role = user_data['role']
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    @staticmethod
+    def get(user_id):
+        user_data = db.get_user_by_id(user_id)
+        if user_data:
+            return User(user_data)
+        return None
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.get(int(user_id))
+
+@app.route('/')
+def index():
+    return redirect(url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        user_data = db.get_user_by_username(username)
+        if user_data and check_password_hash(user_data['password_hash'], password):
+            user = User(user_data)
+            login_user(user)
+            return redirect(url_for('dashboard'))
+        
+        flash('Invalid username or password')
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        role = request.form.get('role')
+
+        if db.get_user_by_username(username):
+            flash('Username already exists')
+            return redirect(url_for('register'))
+
+        password_hash = generate_password_hash(password)
+        db.add_user(username, email, password_hash, role)
+        flash('Registration successful! Please login.')
+        return redirect(url_for('login'))
+
+    return render_template('register.html')
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    exams = db.get_all_exams()
+    for exam in exams:
+        creator = db.get_user_by_id(exam['creator_id'])
+        exam['creator'] = creator
+        # Add start_time and duration if not present
+        if 'start_time' not in exam:
+            exam['start_time'] = datetime.now()
+        if 'duration' not in exam:
+            exam['duration'] = 60  # default 60 minutes
+        if 'total_marks' not in exam:
+            exam['total_marks'] = 100  # default 100 marks
+    return render_template('student_dashboard.html', exams=exams)
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+@app.route('/create_exam', methods=['GET', 'POST'])
+@login_required
+def create_exam():
+    if current_user.role != 'teacher':
+        flash('Only teachers can create exams')
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        try:
+            title = request.form.get('title')
+            description = request.form.get('description')
+            duration = int(request.form.get('duration'))
+            
+            # Create the exam
+            exam = db.add_exam(title, description, duration, current_user.id)
+            exam_id = exam.get('id')
+            
+            # Get all question data
+            question_texts = request.form.getlist('question_text[]')
+            question_types = request.form.getlist('question_type[]')
+            points = request.form.getlist('points[]')
+            
+            # Get options and correct answers
+            all_options = request.form.getlist('options[]')
+            correct_answers = request.form.getlist('correct_answer[]')
+            
+            # Process each question
+            options_index = 0
+            for i in range(len(question_texts)):
+                question_type = question_types[i]
+                
+                # Handle different question types
+                if question_type == 'multiple_choice':
+                    # For multiple choice, take 4 options
+                    question_options = all_options[options_index:options_index + 4]
+                    options_index += 4
+                elif question_type == 'true_false':
+                    # For true/false, only use 2 options
+                    question_options = ['صح', 'خطأ']
+                else:
+                    # For essay questions, no options needed
+                    question_options = []
+                
+                # Add the question to the database
+                db.add_question(
+                    exam_id,
+                    question_texts[i],
+                    question_options,
+                    int(correct_answers[i]) if question_options else 0,  # 0 for essay questions
+                    float(points[i])
+                )
+            
+            flash('تم إنشاء الاختبار بنجاح!', 'success')
+            return redirect(url_for('dashboard'))
+            
+        except Exception as e:
+            flash(f'حدث خطأ أثناء إنشاء الاختبار: {str(e)}', 'error')
+            return redirect(url_for('create_exam'))
+
+    return render_template('create_exam.html')
+
+@app.route('/take_exam/<int:exam_id>', methods=['GET', 'POST'])
+@login_required
+def take_exam(exam_id):
+    exam = db.get_exam_by_id(exam_id)
+    if not exam:
+        flash('Exam not found')
+        return redirect(url_for('dashboard'))
+
+    if not exam['is_active']:
+        flash('This exam is not active')
+        return redirect(url_for('dashboard'))
+
+    questions = db.get_questions_by_exam_id(exam_id)
+
+    if request.method == 'POST':
+        answers = {}
+        score = 0
+        max_score = 0
+
+        for question in questions:
+            answer = request.form.get(f'question_{question["id"]}')
+            if answer is not None:
+                answer = int(answer)
+                answers[question['id']] = answer
+                max_score += question['points']
+                if answer == question['correct_answer']:
+                    score += question['points']
+
+        db.add_exam_result(
+            exam_id,
+            current_user.id,
+            score,
+            max_score,
+            answers,
+            datetime.utcnow(),
+            datetime.utcnow()
+        )
+
+        flash(f'Exam submitted! Your score: {score}/{max_score}')
+        return redirect(url_for('dashboard'))
+
+    return render_template('take_exam.html', exam=exam, questions=questions)
+
+@app.route('/toggle_exam/<int:exam_id>', methods=['POST'])
+@login_required
+def toggle_exam(exam_id):
+    if current_user.role != 'teacher':
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    exam = db.get_exam_by_id(exam_id)
+    if not exam:
+        return jsonify({'error': 'Exam not found'}), 404
+
+    new_status = request.json.get('status', not exam['is_active'])
+    db.update_exam_status(exam_id, new_status)
+    
+    return jsonify({'status': 'success', 'is_active': new_status})
+
+@app.route('/exam_results/<int:exam_id>')
+@login_required
+def view_exam_results(exam_id):
+    exam = db.get_exam_by_id(exam_id)
+    if not exam:
+        flash('Exam not found')
+        return redirect(url_for('dashboard'))
+
+    results = db.get_exam_results_by_exam_id(exam_id)
+    for result in results:
+        student = db.get_user_by_id(result['student_id'])
+        result['student'] = student
+
+    return render_template('exam_results.html', exam=exam, results=results)
+
+@app.route('/admin/database')
+@login_required
+def view_database():
+    if current_user.role != 'teacher':
+        flash('Access denied. Only teachers can view database contents.', 'danger')
+        return redirect(url_for('dashboard'))
+        
+    # Get database contents
+    cursor = db.session.execute(text("""
+        SELECT name FROM sqlite_master WHERE type='table';
+    """))
+    tables = [row[0] for row in cursor]
+    
+    table_data = {}
+    for table in tables:
+        # Get column names
+        cursor = db.session.execute(text(f"PRAGMA table_info({table})"))
+        columns = [row[1] for row in cursor]
+        
+        # Get table data
+        cursor = db.session.execute(text(f"SELECT * FROM {table}"))
+        rows = cursor.fetchall()
+        
+        table_data[table] = {
+            'columns': columns,
+            'rows': rows
+        }
+    
+    return render_template('database_view.html', table_data=table_data)
+
+@app.route('/edit_exam/<int:exam_id>', methods=['GET', 'POST'])
+@login_required
+def edit_exam(exam_id):
+    if current_user.role != 'teacher':
+        flash('Only teachers can edit exams.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    exam = db.get_exam_by_id(exam_id)
+    if not exam:
+        flash('Exam not found.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get questions for the exam
+    exam['questions'] = db.get_questions_by_exam_id(exam_id)
+    
+    if request.method == 'POST':
+        title = request.form.get('title')
+        description = request.form.get('description')
+        duration = request.form.get('duration')
+        questions = []
+        
+        # Get all questions from the form
+        i = 0
+        while f'question_{i}' in request.form:
+            question_text = request.form.get(f'question_{i}')
+            correct_answer = request.form.get(f'correct_answer_{i}')
+            options = [
+                request.form.get(f'option_{i}_0'),
+                request.form.get(f'option_{i}_1'),
+                request.form.get(f'option_{i}_2'),
+                request.form.get(f'option_{i}_3')
+            ]
+            
+            questions.append({
+                'text': question_text,
+                'options': options,
+                'correct_answer': correct_answer
+            })
+            i += 1
+        
+        # Update exam in database
+        db.update_exam(exam_id, {
+            'title': title,
+            'description': description,
+            'duration': int(duration),
+            'questions': questions
+        })
+        
+        flash('Exam updated successfully!', 'success')
+        return redirect(url_for('dashboard'))
+    
+    return render_template('edit_exam.html', exam=exam)
+
+@app.route('/verify_exam/<int:exam_id>', methods=['POST'])
+@login_required
+def verify_exam(exam_id):
+    try:
+        exam = db.get_exam_by_id(exam_id)
+        if not exam:
+            return jsonify({'success': False, 'message': 'الاختبار غير موجود'}), 404
+        
+        # Check if the exam is active
+        if not exam.get('is_active', False):
+            return jsonify({'success': False, 'message': 'الاختبار غير متاح حالياً'}), 400
+            
+        # Check if the student is already enrolled
+        if db.is_student_enrolled(current_user.id, exam_id):
+            return jsonify({'success': False, 'message': 'أنت مسجل بالفعل في هذا الاختبار'}), 400
+            
+        # Check exam time
+        current_time = datetime.now()
+        exam_time = datetime.strptime(exam['start_time'], '%Y-%m-%d %H:%M:%S')
+        
+        if current_time < exam_time:
+            return jsonify({'success': False, 'message': 'لم يحن موعد الاختبار بعد'}), 400
+            
+        if (current_time - exam_time).total_seconds() > exam['duration'] * 60:
+            return jsonify({'success': False, 'message': 'انتهى وقت الاختبار'}), 400
+        
+        # Enroll the student
+        db.enroll_student(current_user.id, exam_id)
+        
+        return jsonify({
+            'success': True,
+            'message': 'تم التحقق بنجاح'
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error in verify_exam: {str(e)}")
+        return jsonify({'success': False, 'message': 'حدث خطأ أثناء التحقق'}), 500
+
+def create_sample_data():
+    # Create admin user
+    if not db.get_user_by_username('admin'):
+        db.add_user(
+            'admin',
+            'admin@example.com',
+            generate_password_hash('admin'),
+            'admin'
+        )
+
+    # Create teacher
+    if not db.get_user_by_username('teacher'):
+        db.add_user(
+            'teacher',
+            'teacher@example.com',
+            generate_password_hash('teacher'),
+            'teacher'
+        )
+
+    # Create student
+    if not db.get_user_by_username('student'):
+        db.add_user(
+            'student',
+            'student@example.com',
+            generate_password_hash('student'),
+            'student'
+        )
+
+if __name__ == '__main__':
+    create_sample_data()
+    app.run(debug=True)

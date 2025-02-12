@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-4 text-center mb-4">
+                <i class="fas fa-graduation-cap"></i> 
+                {% if current_user.role == 'teacher' %}
+                لوحة تحكم المعلم
+                {% else %}
+                الامتحانات المتاحة
+                {% endif %}
+            </h1>
+        </div>
+    </div>
+
+    {% if current_user.role == 'teacher' %}
+    <div class="row mb-4">
+        <div class="col text-center">
+            <a href="{{ url_for('create_exam') }}" class="btn btn-primary btn-lg">
+                <i class="fas fa-plus-circle"></i> إنشاء اختبار جديد
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        {% if exams %}
+            {% for exam in exams %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100 exam-card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-book"></i> {{ exam.title }}
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="exam-icon text-center mb-3">
+                            {% if 'math' in exam.title.lower() %}
+                            <i class="fas fa-square-root-alt fa-3x text-primary"></i>
+                            {% elif 'science' in exam.title.lower() %}
+                            <i class="fas fa-atom fa-3x text-success"></i>
+                            {% elif 'english' in exam.title.lower() %}
+                            <i class="fas fa-language fa-3x text-info"></i>
+                            {% else %}
+                            <i class="fas fa-edit fa-3x text-secondary"></i>
+                            {% endif %}
+                        </div>
+                        
+                        <p class="card-text">{{ exam.description }}</p>
+                        
+                        <div class="exam-details">
+                            <div class="detail-item">
+                                <i class="fas fa-clock text-muted"></i>
+                                <span>المدة: {{ exam.duration }} دقيقة</span>
+                            </div>
+                            {% if current_user.role == 'teacher' %}
+                            <div class="detail-item">
+                                <i class="fas fa-users text-muted"></i>
+                                <span>عدد الطلاب: {{ exam.students|length }}</span>
+                            </div>
+                            {% endif %}
+                            <div class="detail-item">
+                                <i class="fas fa-check-circle {% if exam.is_active %}text-success{% else %}text-danger{% endif %}"></i>
+                                <span>الحالة: {% if exam.is_active %}نشط{% else %}متوقف{% endif %}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-light">
+                        {% if current_user.role == 'teacher' %}
+                        <div class="btn-group w-100">
+                            <a href="{{ url_for('edit_exam', exam_id=exam.id) }}" class="btn btn-outline-primary">
+                                <i class="fas fa-edit"></i> تعديل
+                            </a>
+                            <a href="{{ url_for('view_exam_results', exam_id=exam.id) }}" class="btn btn-outline-info">
+                                <i class="fas fa-chart-bar"></i> النتائج
+                            </a>
+                            {% if exam.is_active %}
+                            <button class="btn btn-outline-warning" onclick="toggleExamStatus('{{ exam.id }}', false)">
+                                <i class="fas fa-pause"></i> إيقاف
+                            </button>
+                            {% else %}
+                            <button class="btn btn-outline-success" onclick="toggleExamStatus('{{ exam.id }}', true)">
+                                <i class="fas fa-play"></i> تفعيل
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <div class="btn-group w-100">
+                            {% if exam.is_active %}
+                            <a href="{{ url_for('take_exam', exam_id=exam.id) }}" class="btn btn-primary">
+                                <i class="fas fa-pencil-alt"></i> بدء الامتحان
+                            </a>
+                            {% else %}
+                            <button class="btn btn-secondary" disabled>
+                                <i class="fas fa-lock"></i> الامتحان مغلق
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="col-12">
+            <div class="alert alert-info text-center">
+                <i class="fas fa-info-circle fa-2x mb-3"></i>
+                <h4>
+                {% if current_user.role == 'teacher' %}
+                لا توجد امتحانات منشأة. قم بإنشاء امتحان جديد باستخدام الزر أعلاه.
+                {% else %}
+                لا توجد امتحانات متاحة حالياً.
+                {% endif %}
+                </h4>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.exam-card {
+    transition: transform 0.2s;
+    border: none;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    background-color: var(--card-bg);
+}
+
+.exam-card .card-body {
+    color: var(--text-primary);
+}
+
+.exam-card .card-header {
+    background-color: var(--primary-color);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.exam-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+}
+
+.exam-icon {
+    padding: 20px 0;
+    color: var(--text-primary);
+}
+
+.exam-details {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    color: var(--text-primary);
+}
+
+.detail-item i {
+    margin-left: 10px;
+    width: 20px;
+    color: var(--text-secondary);
+}
+
+.detail-item span {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.card-footer {
+    background-color: var(--card-bg);
+    border-top: 1px solid var(--border-color);
+}
+
+.card-footer .btn-group .btn {
+    flex: 1;
+}
+
+.alert {
+    padding: 2rem;
+    border-radius: 10px;
+    background-color: var(--card-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.alert i {
+    display: block;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+}
+
+.card-text {
+    color: var(--text-secondary);
+}
+</style>
+
+<script>
+function toggleExamStatus(examId, status) {
+    fetch(`/toggle_exam/${examId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ is_active: status })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        }
+    });
+}
+</script>
+{% endblock %}

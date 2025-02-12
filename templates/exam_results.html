@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-4 text-center">
+                <i class="fas fa-chart-bar"></i> نتائج الاختبار
+            </h1>
+            <h2 class="text-center text-muted">{{ exam.title }}</h2>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h3 class="mb-0">
+                <i class="fas fa-info-circle"></i> معلومات الاختبار
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>الوصف:</strong> {{ exam.description }}</p>
+                    <p><strong>المدة:</strong> {{ exam.duration }} دقيقة</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>تاريخ الإنشاء:</strong> {{ exam.created_at.strftime('%Y-%m-%d') }}</p>
+                    <p><strong>الحالة:</strong> 
+                        <span class="badge {% if exam.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                            {% if exam.is_active %}نشط{% else %}متوقف{% endif %}
+                        </span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if results %}
+    <div class="card">
+        <div class="card-header bg-info text-white">
+            <h3 class="mb-0">
+                <i class="fas fa-users"></i> نتائج الطلاب
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>اسم الطالب</th>
+                            <th>البريد الإلكتروني</th>
+                            <th>الدرجة</th>
+                            <th>النسبة المئوية</th>
+                            <th>وقت البدء</th>
+                            <th>وقت الانتهاء</th>
+                            <th>المدة المستغرقة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for result in results %}
+                        <tr>
+                            <td>{{ result.student.username }}</td>
+                            <td>{{ result.student.email }}</td>
+                            <td>{{ result.score }}/{{ result.max_score }}</td>
+                            <td>
+                                {% if result.max_score > 0 %}
+                                    {% set percentage = (result.score / result.max_score * 100)|round(1) %}
+                                {% else %}
+                                    {% set percentage = 0 %}
+                                {% endif %}
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar {% if percentage >= 90 %}bg-success
+                                                           {% elif percentage >= 70 %}bg-info
+                                                           {% elif percentage >= 50 %}bg-warning
+                                                           {% else %}bg-danger{% endif %}"
+                                         role="progressbar"
+                                         style="width: {{ percentage }}%"
+                                         aria-valuenow="{{ percentage }}"
+                                         aria-valuemin="0"
+                                         aria-valuemax="100">
+                                        {{ percentage }}%
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{{ result.start_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                {% if result.end_time %}
+                                    {{ result.end_time.strftime('%Y-%m-%d %H:%M') }}
+                                {% else %}
+                                    <span class="text-warning">لم ينته بعد</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if result.end_time %}
+                                    {% set duration = (result.end_time - result.start_time).total_seconds() / 60 %}
+                                    {{ duration|round }} دقيقة
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header bg-success text-white">
+            <h3 class="mb-0">
+                <i class="fas fa-chart-pie"></i> إحصائيات الاختبار
+            </h3>
+        </div>
+        <div class="card-body">
+            {% set total_students = results|length %}
+            {% set completed_exams = results|selectattr('end_time')|list|length %}
+            {% set total_score = results|sum(attribute='score') %}
+            {% set max_possible = results|sum(attribute='max_score') %}
+            {% if max_possible > 0 %}
+                {% set avg_percentage = (total_score / max_possible * 100)|round(1) %}
+            {% else %}
+                {% set avg_percentage = 0 %}
+            {% endif %}
+            {% if total_students > 0 %}
+                {% set avg_score = (total_score / total_students)|round(1) %}
+            {% else %}
+                {% set avg_score = 0 %}
+            {% endif %}
+            
+            <div class="row text-center">
+                <div class="col-md-3">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h5>عدد الطلاب</h5>
+                            <h2>{{ total_students }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h5>الاختبارات المكتملة</h5>
+                            <h2>{{ completed_exams }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h5>متوسط الدرجات</h5>
+                            <h2>{{ avg_score }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h5>متوسط النسبة المئوية</h5>
+                            <h2>{{ avg_percentage }}%</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info text-center">
+        <i class="fas fa-info-circle fa-2x mb-3"></i>
+        <h4>لا توجد نتائج بعد</h4>
+        <p>لم يقم أي طالب بإجراء هذا الاختبار حتى الآن.</p>
+    </div>
+    {% endif %}
+
+    <div class="text-center mt-4">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-lg">
+            <i class="fas fa-arrow-left"></i> العودة للوحة التحكم
+        </a>
+    </div>
+</div>
+
+<style>
+.progress {
+    background-color: #f8f9fa;
+    border-radius: 10px;
+}
+
+.progress-bar {
+    border-radius: 10px;
+    transition: width 0.3s ease;
+}
+
+.card {
+    border: none;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    margin-bottom: 1.5rem;
+}
+
+.table th {
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+.badge {
+    padding: 0.5em 1em;
+    font-size: 0.875em;
+}
+</style>
+{% endblock %}

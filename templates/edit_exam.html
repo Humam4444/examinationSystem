@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="text-center mb-4">تعديل الاختبار</h1>
+    
+    <form method="POST" class="needs-validation" novalidate>
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">معلومات الاختبار</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="title" class="form-label">عنوان الاختبار</label>
+                    <input type="text" class="form-control" id="title" name="title" value="{{ exam.title }}" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="description" class="form-label">وصف الاختبار</label>
+                    <textarea class="form-control" id="description" name="description" rows="3" required>{{ exam.description }}</textarea>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="duration" class="form-label">مدة الاختبار (بالدقائق)</label>
+                    <input type="number" class="form-control" id="duration" name="duration" value="{{ exam.duration }}" required min="1">
+                </div>
+            </div>
+        </div>
+
+        <div id="questions-container">
+            {% for question in exam.questions %}
+            <div class="card mb-4 question-card" data-question-index="{{ loop.index0 }}">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">السؤال {{ loop.index }}</h5>
+                    {% if loop.index > 1 %}
+                    <button type="button" class="btn btn-danger btn-sm remove-question">
+                        <i class="fas fa-trash"></i> حذف السؤال
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">نص السؤال</label>
+                        <input type="text" class="form-control" name="question_{{ loop.index0 }}" value="{{ question.text }}" required>
+                    </div>
+                    
+                    <div class="row">
+                        {% set outer_loop = loop %}
+                        {% for option in question.options %}
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">الخيار {{ loop.index }}</label>
+                            <input type="text" class="form-control" name="option_{{ outer_loop.index0 }}_{{ loop.index0 }}" value="{{ option }}" required>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">الإجابة الصحيحة</label>
+                        <select class="form-select" name="correct_answer_{{ loop.index0 }}" required>
+                            {% for option in question.options %}
+                            <option value="{{ loop.index0 }}" {% if loop.index0|string == question.correct_answer|string %}selected{% endif %}>
+                                الخيار {{ loop.index }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="text-center mb-4">
+            <button type="button" class="btn btn-success" id="add-question">
+                <i class="fas fa-plus"></i> إضافة سؤال
+            </button>
+        </div>
+
+        <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="fas fa-save"></i> حفظ التعديلات
+            </button>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-lg">
+                <i class="fas fa-arrow-left"></i> العودة للوحة التحكم
+            </a>
+        </div>
+    </form>
+</div>
+
+<style>
+.progress {
+    background-color: #f8f9fa;
+    border-radius: 10px;
+}
+
+.progress-bar {
+    border-radius: 10px;
+    transition: width 0.3s ease;
+}
+
+.card {
+    border: none;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    margin-bottom: 1.5rem;
+}
+
+.table th {
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+.badge {
+    padding: 0.5em 1em;
+    font-size: 0.875em;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const questionsContainer = document.getElementById('questions-container');
+    const addQuestionBtn = document.getElementById('add-question');
+    
+    // Add new question
+    addQuestionBtn.addEventListener('click', function() {
+        const questionCards = document.querySelectorAll('.question-card');
+        const newIndex = questionCards.length;
+        
+        const newQuestionCard = document.createElement('div');
+        newQuestionCard.className = 'card mb-4 question-card';
+        newQuestionCard.dataset.questionIndex = newIndex;
+        
+        newQuestionCard.innerHTML = `
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">السؤال ${newIndex + 1}</h5>
+                <button type="button" class="btn btn-danger btn-sm remove-question">
+                    <i class="fas fa-trash"></i> حذف السؤال
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">نص السؤال</label>
+                    <input type="text" class="form-control" name="question_${newIndex}" required>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">الخيار 1</label>
+                        <input type="text" class="form-control" name="option_${newIndex}_0" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">الخيار 2</label>
+                        <input type="text" class="form-control" name="option_${newIndex}_1" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">الخيار 3</label>
+                        <input type="text" class="form-control" name="option_${newIndex}_2" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">الخيار 4</label>
+                        <input type="text" class="form-control" name="option_${newIndex}_3" required>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">الإجابة الصحيحة</label>
+                    <select class="form-select" name="correct_answer_${newIndex}" required>
+                        <option value="0">الخيار 1</option>
+                        <option value="1">الخيار 2</option>
+                        <option value="2">الخيار 3</option>
+                        <option value="3">الخيار 4</option>
+                    </select>
+                </div>
+            </div>
+        `;
+        
+        questionsContainer.appendChild(newQuestionCard);
+    });
+    
+    // Remove question
+    questionsContainer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-question') || e.target.closest('.remove-question')) {
+            const card = e.target.closest('.question-card');
+            card.remove();
+            
+            // Update question numbers
+            document.querySelectorAll('.question-card').forEach((card, index) => {
+                card.querySelector('h5').textContent = `السؤال ${index + 1}`;
+                card.dataset.questionIndex = index;
+                
+                // Update input names
+                card.querySelector('[name^="question_"]').name = `question_${index}`;
+                card.querySelectorAll('[name^="option_"]').forEach((option, optionIndex) => {
+                    option.name = `option_${index}_${optionIndex}`;
+                });
+                card.querySelector('[name^="correct_answer_"]').name = `correct_answer_${index}`;
+            });
+        }
+    });
+    
+    // Form validation
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(event) {
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    });
+});
+</script>
+{% endblock %}

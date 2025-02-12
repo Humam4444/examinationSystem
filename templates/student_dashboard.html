@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="upcoming-exams-section">
+        <h2>الاختبارات القادمة</h2>
+        
+        {% if exams %}
+            {% for exam in exams %}
+                <div class="exam-card" data-exam-id="{{ exam.id }}">
+                    <div class="exam-header">
+                        <h3>{{ exam.title }}</h3>
+                        <div class="exam-status">قيد الانتظار</div>
+                    </div>
+                    
+                    <div class="exam-details">
+                        <div class="detail-item">
+                            <span class="label">التاريخ:</span>
+                            <span class="value">{{ exam.start_time.strftime('%d-%m-%Y') }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">المدة:</span>
+                            <span class="value">{{ exam.duration }} دقيقة</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">الدرجة:</span>
+                            <span class="value">{{ exam.total_marks }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="exam-actions">
+                        <form class="verification-form">
+                            <button type="submit" class="btn btn-outline-primary verification-btn">التحقق</button>
+                        </form>
+                        <form class="start-exam-form" method="POST" action="{{ url_for('take_exam', exam_id=exam.id) }}">
+                            <button type="submit" class="btn btn-primary resume-btn" disabled>بدء</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-exams-message">
+                <p>لا توجد اختبارات قادمة حالياً</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="completed-exams-section">
+        <h2>الاختبارات المكتملة</h2>
+        
+        {% if current_user.exam_results %}
+            {% for result in current_user.exam_results %}
+                <div class="exam-card completed">
+                    <div class="exam-header">
+                        <h3>{{ result.exam.title }}</h3>
+                        <div class="exam-status completed">مكتمل</div>
+                    </div>
+                    
+                    <div class="exam-details">
+                        <div class="detail-item">
+                            <span class="label">التاريخ:</span>
+                            <span class="value">{{ result.end_time.strftime('%d-%m-%Y') }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">الدرجة:</span>
+                            <span class="value">{{ result.score }}/{{ result.exam.total_marks }}</span>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-exams-message">
+                <p>لا توجد اختبارات مكتملة</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle verification form submission
+    document.querySelectorAll('.verification-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const examId = this.closest('.exam-card').dataset.examId;
+            
+            fetch(`/verify_exam/${examId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    alert('تم التحقق بنجاح');
+                    
+                    // Enable the start exam button
+                    const startBtn = this.closest('.exam-actions').querySelector('.start-exam-form button');
+                    startBtn.disabled = false;
+                    
+                    // Disable verification button
+                    this.querySelector('button').disabled = true;
+                } else {
+                    alert(data.message || 'حدث خطأ أثناء التحقق');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('حدث خطأ أثناء التحقق');
+            });
+        });
+    });
+});
+</script>
+{% endblock %}
