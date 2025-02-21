@@ -87,7 +87,9 @@ def load_user(user_id):
 # Routes
 @app.route('/')
 def index():
-    return render_template('index.html')
+    student_count = User.query.filter_by(role='student').count()
+    exam_count = Exam.query.filter_by(is_active=True).count()
+    return render_template('index.html', student_count=student_count, exam_count=exam_count)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():

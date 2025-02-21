@@ -1,71 +1,250 @@
 {% extends "base.html" %}
 
 {% block content %}
+
+
+<style>
+    .stat-card {
+        transition: transform 0.3s, box-shadow 0.3s;
+        background: linear-gradient(135deg, #6B73FF 0%, #000DFF 100%);
+        color: white;
+        border-radius: 15px;
+        overflow: hidden;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    }
+    
+    .counter {
+        font-size: 3rem;
+        font-weight: bold;
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    
+    .animate-counter {
+        animation: slideUp 0.8s forwards;
+    }
+    
+    .feature-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+        margin-bottom: 20px;
+        padding: 2rem !important;
+        color: white;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .feature-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+    }
+    
+    .feature-card:hover::before {
+        opacity: 1;
+    }
+    
+    .feature-card i {
+        color: white;
+        transition: transform 0.3s ease;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 20px;
+        border-radius: 50%;
+        margin-bottom: 1.5rem;
+    }
+    
+    .feature-card:hover i {
+        transform: scale(1.2);
+    }
+    
+    .feature-card h3 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        font-weight: 600;
+    }
+    
+    .feature-card p {
+        opacity: 0.9;
+        line-height: 1.6;
+        margin-bottom: 0;
+    }
+    
+    /* Different gradient for each card */
+    .feature-card.students {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .feature-card.teachers {
+        background: linear-gradient(135deg, #2af598 0%, #009efd 100%);
+    }
+    
+    .feature-card.results {
+        background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+    }
+    
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+
 <div class="container">
     <div class="row justify-content-center text-center">
         <div class="col-md-8">
-            <div class="welcome-section my-5">
+            <!-- <div class="welcome-section my-5">
                 <h1 class="display-4 mb-4">مرحباً بك في نظام الامتحانات</h1>
                 <p class="lead mb-4">نظام متكامل لإدارة وإجراء الاختبارات عبر الإنترنت</p>
+            </div> -->
+        </div>
+    </div>
+
+    <div class="row justify-content-center mb-5">
+        <div class="col-md-5">
+            <div class="stat-card mb-4">
+                <div class="card-body text-center p-4">
+                    <h3 class="card-title">عدد الطلاب المسجلين</h3>
+                    <div class="counter" id="studentCounter">{{ student_count }}</div>
+                    <p class="mt-2">طالب مسجل في النظام</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-5">
+            <div class="stat-card mb-4">
+                <div class="card-body text-center p-4">
+                    <h3 class="card-title">عدد الامتحانات المتاحة</h3>
+                    <div class="counter" id="examCounter">{{ exam_count }}</div>
+                    <p class="mt-2">امتحان متاح حالياً</p>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="row justify-content-center">
-        {% if not current_user.is_authenticated %}
-            <div class="col-md-5">
-                <div class="card mb-4">
-                    <div class="card-body text-center">
-                        <h3 class="card-title">تسجيل الدخول</h3>
-                        <p class="card-text">لديك حساب بالفعل؟ قم بتسجيل الدخول</p>
-                        <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">تسجيل الدخول</a>
-                    </div>
+    {% if not current_user.is_authenticated %}
+    <div class="row justify-content-center mb-5">
+        <div class="col-md-5">
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <h3 class="card-title text-light-custom">تسجيل الدخول</h3>
+                    <p class="card-text text-muted-custom">لديك حساب بالفعل؟ قم بتسجيل الدخول</p>
+                    <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">تسجيل الدخول</a>
                 </div>
             </div>
-            <div class="col-md-5">
-                <div class="card mb-4">
-                    <div class="card-body text-center">
-                        <h3 class="card-title">حساب جديد</h3>
-                        <p class="card-text">ليس لديك حساب؟ قم بإنشاء حساب جديد</p>
-                        <a href="{{ url_for('register') }}" class="btn btn-success btn-lg">تسجيل حساب جديد</a>
-                    </div>
+        </div>
+        <div class="col-md-5">
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <h3 class="card-title text-light-custom">حساب جديد</h3>
+                    <p class="card-text text-muted-custom">ليس لديك حساب؟ قم بإنشاء حساب جديد</p>
+                    <a href="{{ url_for('register') }}" class="btn btn-success btn-lg">تسجيل حساب جديد</a>
                 </div>
             </div>
-        {% else %}
-            <div class="col-md-8">
-                <div class="card mb-4">
-                    <div class="card-body text-center">
-                        <h3 class="card-title">لوحة التحكم</h3>
-                        <p class="card-text">مرحباً {{ current_user.username }}، انتقل إلى لوحة التحكم الخاصة بك</p>
-                        <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg">الذهاب إلى لوحة التحكم</a>
-                    </div>
+        </div>
+    {% else %}
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <h3 class="card-title">لوحة التحكم</h3>
+                    <p class="card-text">مرحباً {{ current_user.username }}، انتقل إلى لوحة التحكم الخاصة بك</p>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg">الذهاب إلى لوحة التحكم</a>
                 </div>
             </div>
-        {% endif %}
-    </div>
+        </div>
+    {% endif %}
 
     <div class="row mt-5">
         <div class="col-md-4">
-            <div class="feature-card text-center p-4">
-                <i class="fas fa-user-graduate fa-3x mb-3"></i>
+            <div class="feature-card students text-center p-4">
+                <i class="fas fa-user-graduate fa-3x"></i>
                 <h3>للطلاب</h3>
                 <p>تقديم الاختبارات بسهولة ومتابعة النتائج</p>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="feature-card text-center p-4">
-                <i class="fas fa-chalkboard-teacher fa-3x mb-3"></i>
+            <div class="feature-card teachers text-center p-4">
+                <i class="fas fa-chalkboard-teacher fa-3x"></i>
                 <h3>للمعلمين</h3>
                 <p>إنشاء وإدارة الاختبارات بكفاءة</p>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="feature-card text-center p-4">
-                <i class="fas fa-chart-bar fa-3x mb-3"></i>
+            <div class="feature-card results text-center p-4">
+                <i class="fas fa-chart-bar fa-3x"></i>
                 <h3>النتائج والتقارير</h3>
                 <p>متابعة وتحليل نتائج الطلاب</p>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+function animateCounter(elementId, targetNumber) {
+    const element = document.getElementById(elementId);
+    element.classList.add('animate-counter');
+    
+    let current = 0;
+    const duration = 2000; // 2 seconds
+    const steps = 60;
+    const increment = targetNumber / steps;
+    const stepTime = duration / steps;
+    
+    const counter = setInterval(() => {
+        current += increment;
+        if (current >= targetNumber) {
+            current = targetNumber;
+            clearInterval(counter);
+        }
+        element.textContent = Math.round(current);
+    }, stepTime);
+}
+
+// Start animations when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    const studentCount = parseInt("{{ student_count }}");
+    const examCount = parseInt("{{ exam_count }}");
+    
+    animateCounter('studentCounter', studentCount);
+    animateCounter('examCounter', examCount);
+    
+    // Add intersection observer for feature cards
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, { threshold: 0.1 });
+    
+    // Observe all feature cards
+    document.querySelectorAll('.feature-card').forEach(card => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        card.style.transition = 'all 0.6s ease';
+        observer.observe(card);
+    });
+});
+</script>
 {% endblock %}

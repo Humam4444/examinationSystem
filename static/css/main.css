@@ -1,0 +1,437 @@
+:root {
+    /* Primary Colors */
+    --primary-color: #4f46e5;
+    --secondary-color: #6366f1;
+    --accent-color: #8b5cf6;
+    
+    /* Backgrounds */
+    --body-bg: #0f172a;
+    --card-bg: #1e293b;
+    --input-bg: #334155;
+    --hover-bg: #2d3748;
+    
+    /* Text Colors */
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    
+    /* Status Colors */
+    --success-color: #22c55e;
+    --warning-color: #eab308;
+    --danger-color: #ef4444;
+    --info-color: #3b82f6;
+    
+    /* Borders */
+    --border-color: #475569;
+    
+    /* Shadows */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+    
+    /* Transitions */
+    --transition-fast: 0.2s ease;
+    --transition-normal: 0.3s ease;
+    --transition-slow: 0.5s ease;
+}
+
+/* Base styles */
+body {
+    background-color: var(--body-bg);
+    font-family: 'Cairo', sans-serif;
+    color: var(--text-primary);
+    font-size: 16px;
+    line-height: 1.6;
+    letter-spacing: 0.3px;
+}
+
+.navbar {
+    background-color: var(--card-bg) !important;
+}
+
+.navbar-brand, .nav-link {
+    color: white !important;
+}
+
+.nav-link:hover {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+/* Form styles */
+.form-control {
+    background-color: var(--input-bg);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+.form-control:focus {
+    background-color: var(--input-bg);
+    border-color: var(--primary-color);
+    color: var(--text-primary);
+    box-shadow: 0 0 0 0.25rem rgba(79, 70, 229, 0.25);
+}
+
+.form-select {
+    background-color: var(--input-bg);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+.form-select:focus {
+    background-color: var(--input-bg);
+    border-color: var(--primary-color);
+    color: var(--text-primary);
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
+}
+
+/* Dashboard styles */
+.dashboard-container {
+    padding: 2rem 0;
+}
+
+.welcome-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    animation: fadeInDown 0.8s ease;
+}
+
+.welcome-header .welcome-icon {
+    font-size: 3rem;
+    color: var(--accent-color);
+    margin-bottom: 1rem;
+}
+
+.welcome-header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, var(--card-bg), var(--hover-bg));
+    border-radius: 15px;
+    padding: 2rem;
+    text-align: center;
+    transition: all var(--transition-normal);
+    animation: fadeInUp 0.8s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-lg);
+}
+
+.stat-icon {
+    font-size: 2.5rem;
+    color: var(--accent-color);
+    margin-bottom: 1rem;
+}
+
+.stat-content h3 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.action-card {
+    text-align: center;
+    margin-bottom: 2rem;
+    animation: fadeInUp 0.8s ease;
+}
+
+.create-exam-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 1rem 2rem;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    border-radius: 50px;
+    text-decoration: none;
+    transition: all var(--transition-normal);
+}
+
+.create-exam-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(79, 70, 229, 0.4);
+    color: white;
+}
+
+.create-exam-btn i {
+    font-size: 1.5rem;
+    margin-left: 1rem;
+}
+
+.section-header {
+    margin-bottom: 2rem;
+}
+
+.section-header h2 {
+    font-size: 1.8rem;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+}
+
+/* Exam card styles */
+.exam-card {
+    background: rgba(30, 41, 59, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    overflow: hidden;
+    transition: all var(--transition-normal);
+    animation: fadeInUp 0.8s ease;
+}
+
+.exam-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-lg);
+}
+
+.exam-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.exam-title h3 {
+    color: white;
+    margin: 0;
+    font-size: 1.3rem;
+}
+
+.badge {
+    padding: 0.5rem 1rem;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+}
+
+.badge-active {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+}
+
+.badge-inactive {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.exam-icon {
+    font-size: 2rem;
+    color: white;
+    opacity: 0.8;
+}
+
+.exam-body {
+    padding: 1.5rem;
+}
+
+.exam-description {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+}
+
+.exam-details {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    color: var(--text-muted);
+}
+
+.detail-item i {
+    margin-left: 0.5rem;
+}
+
+.exam-footer {
+    padding: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.teacher-actions, .student-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.action-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem;
+    border-radius: 10px;
+    border: none;
+    color: white;
+    text-decoration: none;
+    transition: all var(--transition-normal);
+}
+
+.action-btn i {
+    margin-left: 0.5rem;
+}
+
+.edit-btn {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.results-btn {
+    background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+}
+
+.play-btn {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.pause-btn {
+    background: linear-gradient(135deg, #eab308, #ca8a04);
+}
+
+.start-btn {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+}
+
+.disabled-btn {
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    cursor: not-allowed;
+}
+
+.action-btn:hover:not(.disabled-btn) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+/* Empty state styles */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: rgba(30, 41, 59, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 15px;
+    animation: fadeIn 0.8s ease;
+}
+
+.empty-icon {
+    font-size: 4rem;
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}
+
+.empty-state h3 {
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+}
+
+.empty-state p {
+    color: var(--text-muted);
+}
+
+/* Animations */
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* تطبيق الألوان الأساسية على مستوى الصفحة */
+body {
+    color: var(--text-primary);
+}
+
+/* تنسيق النصوص في البطاقات */
+.card {
+    color: var(--text-primary);
+}
+
+/* تنسيق حقول الإدخال */
+input, textarea, select {
+    color: var(--text-primary);
+}
+
+/* تنسيق الروابط */
+a {
+    color: var(--accent-color);
+    transition: var(--transition-fast);
+}
+
+a:hover {
+    color: var(--secondary-color);
+}
+
+/* تنسيق النصوص الثانوية */
+.text-muted {
+    color: var(--text-muted) !important;
+}
+
+/* تنسيق العناوين */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-primary);
+}
+
+/* تنسيق الأزرار */
+.btn {
+    transition: var(--transition-fast);
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
+}
