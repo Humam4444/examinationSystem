@@ -1,0 +1,598 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <!-- Folder Navigation Sidebar -->
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">المجلدات</h5>
+                    <button class="btn btn-light btn-sm" onclick="showCreateFolderModal()">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="folder-tree">
+                        <ul class="list-group list-group-flush" id="folderList">
+                            <li class="list-group-item">
+                                <a href="{{ url_for('question_bank') }}" class="folder-link {% if not current_folder_id %}active{% endif %}">
+                                    <i class="fas fa-folder"></i> كل الأسئلة
+                                </a>
+                            </li>
+                            {% for folder in folders %}
+                            <li class="list-group-item">
+                                <a href="{{ url_for('question_bank', folder_id=folder.id) }}" 
+                                   class="folder-link {% if current_folder_id == folder.id %}active{% endif %}">
+                                    <i class="fas fa-folder"></i> {{ folder.name }}
+                                </a>
+                                <div class="float-end">
+                                    <button class="btn btn-sm btn-link" onclick="editFolder({{ folder.to_dict()|tojson }})">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-link text-danger" onclick="deleteFolder({{ folder.id }})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Questions Main Content -->
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h5 class="mb-0">بنك الأسئلة</h5>
+                        </div>
+                        <div class="col-auto">
+                            <button class="btn btn-light" onclick="showCreateQuestionModal()">
+                                <i class="fas fa-plus"></i> سؤال جديد
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Filters -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <select class="form-select" id="typeFilter" onchange="applyFilters()">
+                                <option value="">نوع السؤال</option>
+                                <option value="multiple_choice">اختيار من متعدد</option>
+                                <option value="essay">مقالي</option>
+                                <option value="true_false">صح/خطأ</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" id="difficultyFilter" onchange="applyFilters()">
+                                <option value="">مستوى الصعوبة</option>
+                                <option value="easy">سهل</option>
+                                <option value="medium">متوسط</option>
+                                <option value="hard">صعب</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <input type="text" class="form-control" id="topicFilter" 
+                                   placeholder="البحث بالموضوع" onkeyup="applyFilters()">
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-secondary w-100" onclick="resetFilters()">
+                                <i class="fas fa-redo"></i> إعادة تعيين
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Questions List -->
+                    <div class="questions-list">
+                        {% for question in questions %}
+                        <div class="card mb-3 question-card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <h6 class="card-title">{{ question.question_text }}</h6>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary" 
+                                                onclick="editQuestion({{ question.to_dict()|tojson }})">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                onclick="deleteQuestion({{ question.id }})">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="question-meta mt-2">
+                                    <span class="badge bg-primary">{{ question.question_type }}</span>
+                                    <span class="badge bg-info">{{ question.difficulty_level }}</span>
+                                    {% if question.subject_tags %}
+                                        {% for tag in question.subject_tags.split(',') %}
+                                        <span class="badge bg-secondary">{{ tag.strip() }}</span>
+                                        {% endfor %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Folder Modal -->
+<div class="modal fade" id="folderModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="folderModalTitle">إنشاء مجلد جديد</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="folderForm">
+                    <input type="hidden" id="folderId">
+                    <div class="mb-3">
+                        <label class="form-label">اسم المجلد</label>
+                        <input type="text" class="form-control" id="folderName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">الوصف</label>
+                        <textarea class="form-control" id="folderDescription"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">المجلد الأب</label>
+                        <select class="form-select" id="parentFolder">
+                            <option value="">بدون مجلد أب</option>
+                            {% for folder in folders %}
+                            <option value="{{ folder.id }}">{{ folder.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" onclick="saveFolder()">حفظ</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Question Modal -->
+<div class="modal fade" id="questionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="questionModalTitle">إضافة سؤال جديد</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="questionForm">
+                    <input type="hidden" id="questionId">
+                    <div class="mb-3">
+                        <label class="form-label">نص السؤال</label>
+                        <textarea class="form-control" id="questionText" rows="3" required></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">نوع السؤال</label>
+                                <select class="form-select" id="questionType" onchange="toggleQuestionOptions()">
+                                    <option value="multiple_choice">اختيار من متعدد</option>
+                                    <option value="true_false">صح/خطأ</option>
+                                    <option value="essay">مقالي</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">النقاط</label>
+                                <input type="number" class="form-control" id="questionPoints" required min="1" value="1">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="optionsContainer" class="mb-3">
+                        <label class="form-label">الخيارات</label>
+                        <div id="optionsList">
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control option-input" placeholder="الخيار 1">
+                                <button class="btn btn-outline-danger" type="button" onclick="removeOption(this)">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="addOption()">
+                            <i class="fas fa-plus"></i> إضافة خيار
+                        </button>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">الإجابة الصحيحة</label>
+                        <input type="text" class="form-control" id="correctAnswer" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">مستوى الصعوبة</label>
+                                <select class="form-select" id="difficultyLevel">
+                                    <option value="easy">سهل</option>
+                                    <option value="medium">متوسط</option>
+                                    <option value="hard">صعب</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">المجلد</label>
+                                <select class="form-select" id="questionFolder">
+                                    <option value="">بدون مجلد</option>
+                                    {% for folder in folders %}
+                                    <option value="{{ folder.id }}">{{ folder.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">الوسوم (افصل بين الوسوم بفاصلة)</label>
+                        <input type="text" class="form-control" id="subjectTags" placeholder="مثال: رياضيات, جبر, معادلات">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" onclick="saveQuestion()">حفظ</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Folder Management
+function showCreateFolderModal() {
+    $('#folderId').val('');
+    $('#folderName').val('');
+    $('#folderDescription').val('');
+    $('#parentFolder').val('');
+    $('#folderModalTitle').text('إنشاء مجلد جديد');
+    $('#folderModal').modal('show');
+}
+
+function editFolder(folder) {
+    document.getElementById('folderModalTitle').textContent = 'تعديل المجلد';
+    document.getElementById('folderId').value = folder.id;
+    document.getElementById('folderName').value = folder.name;
+    document.getElementById('folderDescription').value = folder.description || '';
+    document.getElementById('parentFolder').value = folder.parent_id || '';
+    new bootstrap.Modal(document.getElementById('folderModal')).show();
+}
+
+function saveFolder() {
+    const formData = new FormData();
+    formData.append('name', $('#folderName').val());
+    formData.append('description', $('#folderDescription').val());
+    formData.append('parent_id', $('#parentFolder').val() || null);
+
+    const folderId = $('#folderId').val();
+    const url = folderId ? 
+        `/question-bank/folder/${folderId}` : 
+        '/question-bank/folder/create';
+
+    $.ajax({
+        url: url,
+        type: folderId ? 'PUT' : 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            $('#folderModal').modal('hide');
+            location.reload();
+        },
+        error: function(xhr) {
+            const errorMsg = xhr.responseJSON && xhr.responseJSON.error ? 
+                xhr.responseJSON.error : 
+                'حدث خطأ أثناء حفظ المجلد';
+            alert(errorMsg);
+        }
+    });
+}
+
+async function deleteFolder(folderId) {
+    if (!confirm('هل أنت متأكد من حذف هذا المجلد؟')) return;
+
+    try {
+        const response = await fetch(`/question-bank/folder/${folderId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete folder');
+        location.reload();
+    } catch (error) {
+        alert('Error deleting folder: ' + error.message);
+    }
+}
+
+// Question Management
+function showCreateQuestionModal() {
+    $('#questionId').val('');
+    $('#questionText').val('');
+    $('#questionType').val('multiple_choice');
+    $('#questionPoints').val(1);
+    $('#correctAnswer').val('');
+    $('#difficultyLevel').val('medium');
+    $('#questionFolder').val('');
+    $('#subjectTags').val('');
+    $('#optionsList').html(`
+        <div class="input-group mb-2">
+            <input type="text" class="form-control option-input" placeholder="الخيار 1">
+            <button class="btn btn-outline-danger" type="button" onclick="removeOption(this)">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `);
+    toggleQuestionOptions();
+    $('#questionModalTitle').text('إضافة سؤال جديد');
+    $('#questionModal').modal('show');
+}
+
+function toggleQuestionOptions() {
+    const questionType = $('#questionType').val();
+    const optionsContainer = $('#optionsContainer');
+    
+    if (questionType === 'multiple_choice') {
+        optionsContainer.show();
+    } else {
+        optionsContainer.hide();
+    }
+    
+    if (questionType === 'true_false') {
+        $('#correctAnswer').val('true');
+    } else {
+        $('#correctAnswer').val('');
+    }
+}
+
+function addOption() {
+    const optionCount = $('.option-input').length + 1;
+    const newOption = `
+        <div class="input-group mb-2">
+            <input type="text" class="form-control option-input" placeholder="الخيار ${optionCount}">
+            <button class="btn btn-outline-danger" type="button" onclick="removeOption(this)">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+    $('#optionsList').append(newOption);
+}
+
+function removeOption(button) {
+    $(button).closest('.input-group').remove();
+    // Renumber the remaining options
+    $('.option-input').each((index, input) => {
+        $(input).attr('placeholder', `الخيار ${index + 1}`);
+    });
+}
+
+function saveQuestion() {
+    const questionData = {
+        question_text: $('#questionText').val(),
+        question_type: $('#questionType').val(),
+        points: parseInt($('#questionPoints').val()),
+        correct_answer: $('#correctAnswer').val(),
+        difficulty_level: $('#difficultyLevel').val(),
+        folder_id: $('#questionFolder').val() || null,
+        subject_tags: $('#subjectTags').val()
+    };
+
+    if (questionData.question_type === 'multiple_choice') {
+        questionData.options = $('.option-input').map((_, input) => $(input).val()).get();
+    }
+
+    const questionId = $('#questionId').val();
+    const url = questionId ? 
+        `/question-bank/question/${questionId}` : 
+        '/question-bank/question/create';
+
+    $.ajax({
+        url: url,
+        type: questionId ? 'PUT' : 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(questionData),
+        success: function(response) {
+            $('#questionModal').modal('hide');
+            location.reload();
+        },
+        error: function(xhr) {
+            alert('حدث خطأ أثناء حفظ السؤال');
+        }
+    });
+}
+
+function editQuestion(question) {
+    $('#questionId').val(question.id);
+    $('#questionText').val(question.question_text);
+    $('#questionType').val(question.question_type);
+    $('#questionPoints').val(question.points);
+    $('#correctAnswer').val(question.correct_answer);
+    $('#difficultyLevel').val(question.difficulty_level);
+    $('#questionFolder').val(question.folder_id || '');
+    $('#subjectTags').val(question.subject_tags || '');
+
+    if (question.question_type === 'multiple_choice' && question.options) {
+        $('#optionsList').empty();
+        question.options.forEach((option, index) => {
+            $('#optionsList').append(`
+                <div class="input-group mb-2">
+                    <input type="text" class="form-control option-input" placeholder="الخيار ${index + 1}" value="${option}">
+                    <button class="btn btn-outline-danger" type="button" onclick="removeOption(this)">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `);
+        });
+    }
+
+    toggleQuestionOptions();
+    $('#questionModalTitle').text('تعديل السؤال');
+    $('#questionModal').modal('show');
+}
+
+function deleteQuestion(questionId) {
+    if (confirm('هل أنت متأكد من حذف هذا السؤال؟')) {
+        $.ajax({
+            url: `/question-bank/question/${questionId}`,
+            type: 'DELETE',
+            success: function() {
+                location.reload();
+            },
+            error: function() {
+                alert('حدث خطأ أثناء حذف السؤال');
+            }
+        });
+    }
+}
+
+// Filtering
+function applyFilters() {
+    const type = document.getElementById('typeFilter').value;
+    const difficulty = document.getElementById('difficultyFilter').value;
+    const topic = document.getElementById('topicFilter').value;
+    
+    const url = new URL(window.location);
+    if (type) url.searchParams.set('type', type);
+    else url.searchParams.delete('type');
+    
+    if (difficulty) url.searchParams.set('difficulty', difficulty);
+    else url.searchParams.delete('difficulty');
+    
+    if (topic) url.searchParams.set('topic', topic);
+    else url.searchParams.delete('topic');
+    
+    window.location = url;
+}
+
+function resetFilters() {
+    const url = new URL(window.location);
+    url.search = '';
+    if (url.pathname.includes('folder_id')) {
+        url.searchParams.set('folder_id', new URLSearchParams(window.location.search).get('folder_id'));
+    }
+    window.location = url;
+}
+</script>
+
+<style>
+.folder-tree {
+    max-height: calc(100vh - 250px);
+    overflow-y: auto;
+}
+
+.folder-link {
+    text-decoration: none;
+    color: inherit;
+}
+
+.folder-link:hover {
+    color: #0d6efd;
+}
+
+.folder-link.active {
+    color: #0d6efd;
+    font-weight: bold;
+}
+
+.question-meta .badge {
+    margin-right: 0.25rem;
+}
+
+/* Dark Mode for Modals */
+.modal-content {
+    background-color: #212529;
+    color: #fff;
+}
+
+.modal-header {
+    border-bottom: 1px solid #373b3e;
+}
+
+.modal-footer {
+    border-top: 1px solid #373b3e;
+}
+
+.modal .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+.modal .form-control,
+.modal .form-select {
+    background-color: #2c3034;
+    border-color: #373b3e;
+    color: #fff;
+}
+
+.modal .form-control:focus,
+.modal .form-select:focus {
+    background-color: #2c3034;
+    border-color: #0d6efd;
+    color: #fff;
+}
+
+.modal .form-control::placeholder {
+    color: #6c757d;
+}
+
+.modal .form-label {
+    color: #fff;
+}
+
+.modal .input-group-text {
+    background-color: #373b3e;
+    border-color: #373b3e;
+    color: #fff;
+}
+
+.modal .btn-outline-danger {
+    color: #dc3545;
+    border-color: #dc3545;
+}
+
+.modal .btn-outline-danger:hover {
+    color: #fff;
+    background-color: #dc3545;
+}
+
+.modal .btn-outline-primary {
+    color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.modal .btn-outline-primary:hover {
+    color: #fff;
+    background-color: #0d6efd;
+}
+
+/* Style for option inputs in dark mode */
+.modal .option-input {
+    background-color: #2c3034;
+    color: #fff;
+    border-color: #373b3e;
+}
+
+.modal .option-input:focus {
+    background-color: #2c3034;
+    color: #fff;
+}
+
+/* Style for select dropdowns in dark mode */
+.modal select option {
+    background-color: #212529;
+    color: #fff;
+}
+</style>
+{% endblock %}

@@ -32,37 +32,58 @@
             <div class="card mb-4 question-card" data-question-index="{{ loop.index0 }}">
                 <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">السؤال {{ loop.index }}</h5>
-                    {% if loop.index > 1 %}
                     <button type="button" class="btn btn-danger btn-sm remove-question">
                         <i class="fas fa-trash"></i> حذف السؤال
                     </button>
-                    {% endif %}
                 </div>
                 <div class="card-body">
-                    <div class="mb-3">
-                        <label class="form-label">نص السؤال</label>
-                        <input type="text" class="form-control" name="question_{{ loop.index0 }}" value="{{ question.text }}" required>
-                    </div>
-                    
+                    <input type="hidden" name="question_id[]" value="{{ question.id }}">
                     <div class="row">
-                        {% set outer_loop = loop %}
-                        {% for option in question.options %}
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">الخيار {{ loop.index }}</label>
-                            <input type="text" class="form-control" name="option_{{ outer_loop.index0 }}_{{ loop.index0 }}" value="{{ option }}" required>
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">نص السؤال</label>
+                            <textarea class="form-control" name="question_text[]" rows="2" required>{{ question.question_text }}</textarea>
                         </div>
-                        {% endfor %}
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">نوع السؤال</label>
+                                <select class="form-select" name="question_type[]" onchange="toggleOptions(this)">
+                                    <option value="multiple_choice" {% if question.question_type == 'multiple_choice' %}selected{% endif %}>اختيار من متعدد</option>
+                                    <option value="true_false" {% if question.question_type == 'true_false' %}selected{% endif %}>صح/خطأ</option>
+                                    <option value="essay" {% if question.question_type == 'essay' %}selected{% endif %}>مقالي</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">الدرجة</label>
+                                <input type="number" class="form-control" name="points[]" min="1" value="{{ question.points }}" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">مستوى الصعوبة</label>
+                                <select class="form-select" name="difficulty_level[]" required>
+                                    <option value="easy" {% if question.difficulty_level == 'easy' %}selected{% endif %}>سهل</option>
+                                    <option value="medium" {% if question.difficulty_level == 'medium' %}selected{% endif %}>متوسط</option>
+                                    <option value="hard" {% if question.difficulty_level == 'hard' %}selected{% endif %}>صعب</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">الموضوع/التصنيف</label>
+                                <input type="text" class="form-control" name="subject_tags[]" value="{{ question.subject_tags }}" required>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="form-label">الإجابة الصحيحة</label>
-                        <select class="form-select" name="correct_answer_{{ loop.index0 }}" required>
-                            {% for option in question.options %}
-                            <option value="{{ loop.index0 }}" {% if loop.index0|string == question.correct_answer|string %}selected{% endif %}>
-                                الخيار {{ loop.index }}
-                            </option>
-                            {% endfor %}
-                        </select>
+                    <div class="options-section" {% if question.question_type != 'multiple_choice' %}style="display: none;"{% endif %}>
+                        <div class="mb-3">
+                            <label class="form-label">الخيارات (افصل بين الخيارات بفاصلة)</label>
+                            <input type="text" class="form-control" name="options[]" value="{{ question.options|join(',') if question.options else '' }}" placeholder="الخيار 1, الخيار 2, الخيار 3, الخيار 4">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">الإجابة الصحيحة</label>
+                            <input type="text" class="form-control" name="correct_answer[]" value="{{ question.correct_answer }}" required>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -70,7 +91,7 @@
         </div>
 
         <div class="text-center mb-4">
-            <button type="button" class="btn btn-success" id="add-question">
+            <button type="button" class="btn btn-success" onclick="addQuestion()">
                 <i class="fas fa-plus"></i> إضافة سؤال
             </button>
         </div>
@@ -86,6 +107,70 @@
     </form>
 </div>
 
+<template id="question-template">
+    <div class="question-item card mb-4">
+        <div class="card-header bg-light">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">سؤال جديد</h5>
+                <button type="button" class="btn btn-danger btn-sm" onclick="removeQuestion(this)">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <input type="hidden" name="from_bank[]" value="false">
+            <div class="row">
+                <div class="col-md-8 mb-3">
+                    <label class="form-label">نص السؤال</label>
+                    <textarea class="form-control" name="question_text[]" rows="2" required></textarea>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">نوع السؤال</label>
+                        <select class="form-select" name="question_type[]" onchange="toggleOptions(this)">
+                            <option value="multiple_choice">اختيار من متعدد</option>
+                            <option value="true_false">صح/خطأ</option>
+                            <option value="essay">مقالي</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">الدرجة</label>
+                        <input type="number" class="form-control" name="points[]" min="1" value="1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">مستوى الصعوبة</label>
+                        <select class="form-select" name="difficulty_level[]" required>
+                            <option value="easy">سهل</option>
+                            <option value="medium" selected>متوسط</option>
+                            <option value="hard">صعب</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">الموضوع/التصنيف</label>
+                        <input type="text" class="form-control" name="subject_tags[]" placeholder="مثال: رياضيات, جبر" required>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="options-section">
+                <div class="mb-3">
+                    <label class="form-label">الخيارات (افصل بين الخيارات بفاصلة)</label>
+                    <input type="text" class="form-control" name="options[]" placeholder="الخيار 1, الخيار 2, الخيار 3, الخيار 4">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">الإجابة الصحيحة</label>
+                    <input type="text" class="form-control" name="correct_answer[]" required>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
 <style>
 .progress {
     background-color: #f8f9fa;
@@ -99,111 +184,61 @@
 
 .card {
     border: none;
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    margin-bottom: 1.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    margin-bottom: 1rem;
 }
 
-.table th {
-    font-weight: 600;
-    background-color: #f8f9fa;
+.card-header {
+    border-bottom: none;
 }
 
-.badge {
-    padding: 0.5em 1em;
-    font-size: 0.875em;
+.btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-size: 1.1rem;
+}
+
+.remove-question {
+    transition: all 0.3s ease;
+}
+
+.remove-question:hover {
+    transform: scale(1.05);
 }
 </style>
 
 <script>
+function addQuestion() {
+    const template = document.getElementById('question-template');
+    const container = document.getElementById('questions-container');
+    const clone = template.content.cloneNode(true);
+    container.appendChild(clone);
+    
+    // Show/hide options based on question type
+    const select = container.lastElementChild.querySelector('select[name="question_type[]"]');
+    toggleOptions(select);
+}
+
+function removeQuestion(button) {
+    const questionItem = button.closest('.question-item');
+    questionItem.remove();
+}
+
+function toggleOptions(select) {
+    const questionItem = select.closest('.question-item');
+    const optionsSection = questionItem.querySelector('.options-section');
+    
+    if (select.value === 'multiple_choice') {
+        optionsSection.style.display = 'block';
+    } else {
+        optionsSection.style.display = 'none';
+    }
+}
+
+// Initialize options visibility for existing questions
 document.addEventListener('DOMContentLoaded', function() {
-    const questionsContainer = document.getElementById('questions-container');
-    const addQuestionBtn = document.getElementById('add-question');
-    
-    // Add new question
-    addQuestionBtn.addEventListener('click', function() {
-        const questionCards = document.querySelectorAll('.question-card');
-        const newIndex = questionCards.length;
-        
-        const newQuestionCard = document.createElement('div');
-        newQuestionCard.className = 'card mb-4 question-card';
-        newQuestionCard.dataset.questionIndex = newIndex;
-        
-        newQuestionCard.innerHTML = `
-            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">السؤال ${newIndex + 1}</h5>
-                <button type="button" class="btn btn-danger btn-sm remove-question">
-                    <i class="fas fa-trash"></i> حذف السؤال
-                </button>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label class="form-label">نص السؤال</label>
-                    <input type="text" class="form-control" name="question_${newIndex}" required>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">الخيار 1</label>
-                        <input type="text" class="form-control" name="option_${newIndex}_0" required>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">الخيار 2</label>
-                        <input type="text" class="form-control" name="option_${newIndex}_1" required>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">الخيار 3</label>
-                        <input type="text" class="form-control" name="option_${newIndex}_2" required>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">الخيار 4</label>
-                        <input type="text" class="form-control" name="option_${newIndex}_3" required>
-                    </div>
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label">الإجابة الصحيحة</label>
-                    <select class="form-select" name="correct_answer_${newIndex}" required>
-                        <option value="0">الخيار 1</option>
-                        <option value="1">الخيار 2</option>
-                        <option value="2">الخيار 3</option>
-                        <option value="3">الخيار 4</option>
-                    </select>
-                </div>
-            </div>
-        `;
-        
-        questionsContainer.appendChild(newQuestionCard);
-    });
-    
-    // Remove question
-    questionsContainer.addEventListener('click', function(e) {
-        if (e.target.classList.contains('remove-question') || e.target.closest('.remove-question')) {
-            const card = e.target.closest('.question-card');
-            card.remove();
-            
-            // Update question numbers
-            document.querySelectorAll('.question-card').forEach((card, index) => {
-                card.querySelector('h5').textContent = `السؤال ${index + 1}`;
-                card.dataset.questionIndex = index;
-                
-                // Update input names
-                card.querySelector('[name^="question_"]').name = `question_${index}`;
-                card.querySelectorAll('[name^="option_"]').forEach((option, optionIndex) => {
-                    option.name = `option_${index}_${optionIndex}`;
-                });
-                card.querySelector('[name^="correct_answer_"]').name = `correct_answer_${index}`;
-            });
-        }
-    });
-    
-    // Form validation
-    const form = document.querySelector('form');
-    form.addEventListener('submit', function(event) {
-        if (!form.checkValidity()) {
-            event.preventDefault();
-            event.stopPropagation();
-        }
-        form.classList.add('was-validated');
+    const questionTypes = document.querySelectorAll('select[name="question_type[]"]');
+    questionTypes.forEach(select => {
+        toggleOptions(select);
     });
 });
 </script>

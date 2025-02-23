@@ -32,9 +32,16 @@
                         </div>
 
                         <div class="mb-4">
-                            <button type="button" class="btn btn-secondary" onclick="addQuestion()">
-                                <i class="fas fa-plus"></i> إضافة سؤال
-                            </button>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <button type="button" class="btn btn-secondary me-2" onclick="addQuestion()">
+                                        <i class="fas fa-plus"></i> إضافة سؤال جديد
+                                    </button>
+                                    <button type="button" class="btn btn-info" onclick="showQuestionBank()">
+                                        <i class="fas fa-book"></i> اختيار من بنك الأسئلة
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="d-grid gap-2">
@@ -63,6 +70,7 @@
             </div>
         </div>
         <div class="card-body">
+            <input type="hidden" name="from_bank[]" value="false">
             <div class="row">
                 <div class="col-md-8 mb-3">
                     <label class="form-label">نص السؤال</label>
@@ -83,63 +91,107 @@
                         <label class="form-label">الدرجة</label>
                         <input type="number" class="form-control" name="points[]" min="1" value="1" required>
                     </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">مستوى الصعوبة</label>
+                        <select class="form-select" name="difficulty_level[]" required>
+                            <option value="easy">سهل</option>
+                            <option value="medium" selected>متوسط</option>
+                            <option value="hard">صعب</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">الموضوع/التصنيف</label>
+                        <input type="text" class="form-control" name="subject_tags[]" placeholder="مثال: رياضيات, جبر" required>
+                    </div>
                 </div>
             </div>
             
-            <div class="options-container">
+            <div class="options-section">
                 <div class="mb-3">
-                    <label class="form-label">الخيارات</label>
-                    <div class="options-list">
-                        <div class="row mb-2">
-                            <div class="col">
-                                <input type="text" class="form-control" name="options[]" placeholder="الخيار 1" required>
-                            </div>
-                            <div class="col-auto">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="correct_answer_temp" value="0" required>
-                                    <label class="form-check-label">صحيح</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row mb-2">
-                            <div class="col">
-                                <input type="text" class="form-control" name="options[]" placeholder="الخيار 2" required>
-                            </div>
-                            <div class="col-auto">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="correct_answer_temp" value="1">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row mb-2">
-                            <div class="col">
-                                <input type="text" class="form-control" name="options[]" placeholder="الخيار 3" required>
-                            </div>
-                            <div class="col-auto">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="correct_answer_temp" value="2">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row mb-2">
-                            <div class="col">
-                                <input type="text" class="form-control" name="options[]" placeholder="الخيار 4" required>
-                            </div>
-                            <div class="col-auto">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="correct_answer_temp" value="3">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <label class="form-label">الخيارات (افصل بين الخيارات بفاصلة)</label>
+                    <input type="text" class="form-control" name="options[]" placeholder="الخيار 1, الخيار 2, الخيار 3, الخيار 4">
                 </div>
                 
-                <!-- Hidden input to store the actual correct answer -->
-                <input type="hidden" name="correct_answer[]" value="0">
+                <div class="mb-3">
+                    <label class="form-label">الإجابة الصحيحة</label>
+                    <input type="text" class="form-control" name="correct_answer[]" required>
+                </div>
             </div>
         </div>
     </div>
 </template>
+
+<!-- Add Question Bank Modal -->
+<div class="modal fade" id="questionBankModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">اختيار من بنك الأسئلة</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Search and Filter Section -->
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <input type="text" class="form-control bg-dark text-light border-secondary" id="questionSearch" placeholder="بحث في الأسئلة...">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select bg-dark text-light border-secondary" id="folderFilter">
+                            <option value="">كل المجلدات</option>
+                            <!-- Folders will be loaded here -->
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select bg-dark text-light border-secondary" id="difficultyFilter">
+                            <option value="">كل مستويات الصعوبة</option>
+                            <option value="easy">سهل</option>
+                            <option value="medium">متوسط</option>
+                            <option value="hard">صعب</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select bg-dark text-light border-secondary" id="typeFilter">
+                            <option value="">كل أنواع الأسئلة</option>
+                            <option value="multiple_choice">اختيار من متعدد</option>
+                            <option value="true_false">صح/خطأ</option>
+                            <option value="essay">مقالي</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-outline-light w-100" onclick="filterQuestions()">
+                            <i class="fas fa-filter"></i> تصفية
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Questions List -->
+                <div class="table-responsive">
+                    <table class="table table-hover table-dark">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="selectAll" onclick="toggleAllQuestions()"></th>
+                                <th>السؤال</th>
+                                <th>النوع</th>
+                                <th>الصعوبة</th>
+                                <th>الموضوع</th>
+                                <th>الدرجة</th>
+                            </tr>
+                        </thead>
+                        <tbody id="questionBankList">
+                            <!-- Questions will be loaded here dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" onclick="addSelectedQuestions()">إضافة الأسئلة المحددة</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <style>
 .card {
@@ -169,6 +221,38 @@
     background-color: #0d6efd;
     border-color: #0d6efd;
 }
+
+/* Question Bank Modal Styles */
+#questionBankModal .table {
+    direction: rtl;
+}
+#questionBankModal .modal-dialog {
+    max-width: 90%;
+}
+.selected-question {
+    background-color: rgba(13, 110, 253, 0.2) !important;
+}
+
+/* Dark theme input styles */
+#questionBankModal input::placeholder {
+    color: #adb5bd;
+}
+
+#questionBankModal .form-control:focus,
+#questionBankModal .form-select:focus {
+    background-color: #2b3035;
+    border-color: #0d6efd;
+    color: #fff;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+#questionBankModal .table-hover tbody tr:hover {
+    background-color: #2b3035;
+}
+
+#questionBankModal .badge {
+    background-color: #6c757d !important;
+}
 </style>
 
 <script>
@@ -185,15 +269,7 @@ function addQuestion() {
     const questionHeader = questionItem.querySelector('h5');
     questionHeader.textContent = `السؤال ${questionCounter}`;
     
-    // Fix the radio button names to be unique for this question
-    const radioButtons = clone.querySelectorAll('input[type="radio"]');
-    radioButtons.forEach(radio => {
-        radio.name = `correct_answer_temp_${questionCounter}`;
-        radio.addEventListener('change', updateCorrectAnswer);
-    });
-    
     container.appendChild(clone);
-    toggleOptions(questionItem.querySelector('select'));
 }
 
 function removeQuestion(button) {
@@ -211,46 +287,13 @@ function removeQuestion(button) {
 
 function toggleOptions(select) {
     const questionItem = select.closest('.question-item');
-    const optionsContainer = questionItem.querySelector('.options-container');
-    const optionInputs = questionItem.querySelectorAll('input[name="options[]"]');
-    const radioButtons = questionItem.querySelectorAll('input[type="radio"]');
-    const correctAnswerInput = questionItem.querySelector('input[name="correct_answer[]"]');
+    const optionsSection = questionItem.querySelector('.options-section');
     
     if (select.value === 'multiple_choice') {
-        optionsContainer.style.display = 'block';
-        optionInputs.forEach(input => {
-            input.required = true;
-            input.closest('.row').style.display = '';
-        });
-    } else if (select.value === 'true_false') {
-        optionsContainer.style.display = 'block';
-        optionInputs[0].value = 'صح';
-        optionInputs[1].value = 'خطأ';
-        optionInputs[0].required = true;
-        optionInputs[1].required = true;
-        
-        // Hide options 3 and 4
-        optionInputs[2].closest('.row').style.display = 'none';
-        optionInputs[3].closest('.row').style.display = 'none';
-        optionInputs[2].required = false;
-        optionInputs[3].required = false;
-        
-        // Reset radio selection
-        radioButtons[0].checked = true;
-        correctAnswerInput.value = "0";
+        optionsSection.style.display = 'block';
     } else {
-        optionsContainer.style.display = 'none';
-        optionInputs.forEach(input => {
-            input.required = false;
-        });
-        correctAnswerInput.value = "0";
+        optionsSection.style.display = 'none';
     }
-}
-
-function updateCorrectAnswer(event) {
-    const questionItem = event.target.closest('.question-item');
-    const correctAnswerInput = questionItem.querySelector('input[name="correct_answer[]"]');
-    correctAnswerInput.value = event.target.value;
 }
 
 // Form validation before submission
@@ -265,12 +308,11 @@ document.getElementById('examForm').addEventListener('submit', function(e) {
     // Validate each question
     questions.forEach(question => {
         const type = question.querySelector('select[name="question_type[]"]').value;
-        if (type === 'multiple_choice' || type === 'true_false') {
-            const radioButtons = question.querySelectorAll('input[type="radio"]');
-            const checked = Array.from(radioButtons).some(radio => radio.checked);
-            if (!checked) {
+        if (type === 'multiple_choice') {
+            const options = question.querySelector('input[name="options[]"]').value;
+            if (!options) {
                 e.preventDefault();
-                alert('يجب تحديد الإجابة الصحيحة لكل سؤال');
+                alert('يجب إدخال الخيارات للأسئلة من نوع اختيار من متعدد');
                 return;
             }
         }
@@ -281,5 +323,204 @@ document.getElementById('examForm').addEventListener('submit', function(e) {
 document.addEventListener('DOMContentLoaded', function() {
     addQuestion();
 });
+
+// Question Bank Integration
+let questionBankModal;
+let selectedQuestions = new Set();
+let folderHierarchy = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    questionBankModal = new bootstrap.Modal(document.getElementById('questionBankModal'));
+    loadFolders();
+});
+
+function loadFolders() {
+    fetch('/api/question_bank/folders')
+        .then(response => response.json())
+        .then(folders => {
+            folderHierarchy = folders;
+            const folderSelect = document.getElementById('folderFilter');
+            folderSelect.innerHTML = '<option value="">كل المجلدات</option>';
+            
+            function addFolderOptions(folders, level = 0) {
+                folders.forEach(folder => {
+                    const indent = '- '.repeat(level);
+                    const option = document.createElement('option');
+                    option.value = folder.id;
+                    option.textContent = indent + folder.name;
+                    folderSelect.appendChild(option);
+                    
+                    if (folder.children && folder.children.length > 0) {
+                        addFolderOptions(folder.children, level + 1);
+                    }
+                });
+            }
+            
+            addFolderOptions(folders);
+        });
+}
+
+function showQuestionBank() {
+    loadQuestionBankQuestions();
+    questionBankModal.show();
+}
+
+function loadQuestionBankQuestions() {
+    const searchQuery = document.getElementById('questionSearch').value;
+    const difficultyFilter = document.getElementById('difficultyFilter').value;
+    const typeFilter = document.getElementById('typeFilter').value;
+    const folderFilter = document.getElementById('folderFilter').value;
+
+    fetch(`/api/question_bank/questions?search=${searchQuery}&difficulty=${difficultyFilter}&type=${typeFilter}&folder_id=${folderFilter}`)
+        .then(response => response.json())
+        .then(questions => {
+            const tbody = document.getElementById('questionBankList');
+            tbody.innerHTML = '';
+            
+            questions.forEach(question => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><input type="checkbox" value="${question.id}" ${selectedQuestions.has(question.id) ? 'checked' : ''} onchange="toggleQuestion(${question.id}, this)"></td>
+                    <td>
+                        ${question.question_text}
+                        ${!question.folder_id ? '<span class="badge bg-secondary ms-2">غير مصنف</span>' : ''}
+                    </td>
+                    <td>${translateQuestionType(question.question_type)}</td>
+                    <td>${translateDifficulty(question.difficulty_level)}</td>
+                    <td>${question.subject_tags}</td>
+                    <td>${question.points}</td>
+                `;
+                if (selectedQuestions.has(question.id)) {
+                    row.classList.add('selected-question');
+                }
+                tbody.appendChild(row);
+            });
+        });
+}
+
+function toggleQuestion(questionId, checkbox) {
+    if (checkbox.checked) {
+        selectedQuestions.add(questionId);
+        checkbox.closest('tr').classList.add('selected-question');
+    } else {
+        selectedQuestions.delete(questionId);
+        checkbox.closest('tr').classList.remove('selected-question');
+    }
+}
+
+function toggleAllQuestions() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('#questionBankList input[type="checkbox"]');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+        const questionId = parseInt(checkbox.value);
+        if (selectAll.checked) {
+            selectedQuestions.add(questionId);
+            checkbox.closest('tr').classList.add('selected-question');
+        } else {
+            selectedQuestions.delete(questionId);
+            checkbox.closest('tr').classList.remove('selected-question');
+        }
+    });
+}
+
+function filterQuestions() {
+    loadQuestionBankQuestions();
+}
+
+function addSelectedQuestions() {
+    if (selectedQuestions.size === 0) {
+        alert('الرجاء اختيار سؤال واحد على الأقل');
+        return;
+    }
+
+    fetch('/api/question_bank/get_questions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            question_ids: Array.from(selectedQuestions)
+        })
+    })
+    .then(response => response.json())
+    .then(questions => {
+        questions.forEach(question => {
+            addQuestionFromBank(question);
+        });
+        questionBankModal.hide();
+    });
+}
+
+function addQuestionFromBank(question) {
+    const container = document.getElementById('questions-container');
+    const questionCount = container.children.length;
+    
+    const questionDiv = document.createElement('div');
+    questionDiv.className = 'question-item card mb-4';
+    questionDiv.innerHTML = `
+        <div class="card-header bg-light">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">سؤال من بنك الأسئلة</h5>
+                <button type="button" class="btn btn-danger btn-sm" onclick="removeQuestion(this)">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <input type="hidden" name="question_id[]" value="${question.id}">
+            <input type="hidden" name="from_bank[]" value="true">
+            <input type="hidden" name="correct_answer[]" value="${question.correct_answer}">
+            <input type="hidden" name="options[]" value="${question.options ? question.options.join(',') : ''}">
+            <div class="row">
+                <div class="col-md-8 mb-3">
+                    <label class="form-label">نص السؤال</label>
+                    <textarea class="form-control" name="question_text[]" rows="2" readonly>${question.question_text}</textarea>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">نوع السؤال</label>
+                        <input type="text" class="form-control" value="${translateQuestionType(question.question_type)}" readonly>
+                        <input type="hidden" name="question_type[]" value="${question.question_type}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">الدرجة</label>
+                        <input type="number" class="form-control" name="points[]" min="1" value="${question.points}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">مستوى الصعوبة</label>
+                        <input type="text" class="form-control" value="${translateDifficulty(question.difficulty_level)}" readonly>
+                        <input type="hidden" name="difficulty_level[]" value="${question.difficulty_level}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">الموضوع/التصنيف</label>
+                        <input type="text" class="form-control" name="subject_tags[]" value="${question.subject_tags}" readonly>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(questionDiv);
+}
+
+function translateQuestionType(type) {
+    const types = {
+        'multiple_choice': 'اختيار من متعدد',
+        'true_false': 'صح/خطأ',
+        'essay': 'مقالي'
+    };
+    return types[type] || type;
+}
+
+function translateDifficulty(level) {
+    const levels = {
+        'easy': 'سهل',
+        'medium': 'متوسط',
+        'hard': 'صعب'
+    };
+    return levels[level] || level;
+}
 </script>
 {% endblock %}

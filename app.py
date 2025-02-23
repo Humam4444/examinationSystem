@@ -47,26 +47,64 @@ class Exam(db.Model):
     questions = db.relationship('Question', backref='exam', lazy=True)
     results = db.relationship('ExamResult', backref='exam', lazy=True)
 
-# Question Model
-class Question(db.Model):
+# Question Folder Model
+class QuestionFolder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    exam_id = db.Column(db.Integer, db.ForeignKey('exam.id'), nullable=False)
-    question_text = db.Column(db.String(500), nullable=False)
-    question_type = db.Column(db.String(20), nullable=False)  # multiple_choice, true_false, text
-    points = db.Column(db.Integer, nullable=False)
-    options = db.Column(PickleType)  # لتخزين خيارات السؤال في حالة الاختيار من متعدد
-    correct_answer = db.Column(db.String(500), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    parent_id = db.Column(db.Integer, db.ForeignKey('question_folder.id'))
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    questions = db.relationship('Question', backref='folder', lazy=True)
+    children = db.relationship('QuestionFolder', backref=db.backref('parent', remote_side=[id]))
 
     def __repr__(self):
-        return f'<Question {self.id}>'
+        return f'<QuestionFolder {self.name}>'
 
     def to_dict(self):
         return {
             'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'parent_id': self.parent_id,
+            'created_by': self.created_by,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+# Question Model
+class Question(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    exam_id = db.Column(db.Integer, db.ForeignKey('exam.id'), nullable=True)  # Make nullable for question bank
+    folder_id = db.Column(db.Integer, db.ForeignKey('question_folder.id'), nullable=True)
+    question_text = db.Column(db.String(500), nullable=False)
+    question_type = db.Column(db.String(20), nullable=False)  # multiple_choice, essay, etc.
+    correct_answer = db.Column(db.String(500), nullable=False)
+    points = db.Column(db.Integer, nullable=False)
+    options = db.Column(PickleType)
+    difficulty_level = db.Column(db.String(20), nullable=False, default='medium')  # easy, medium, hard
+    subject_tags = db.Column(db.String(200))  # Comma-separated tags
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<Question {self.id}: {self.question_text[:30]}...>'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'exam_id': self.exam_id,
+            'folder_id': self.folder_id,
             'question_text': self.question_text,
             'question_type': self.question_type,
             'points': self.points,
-            'options': self.options if self.question_type == 'multiple_choice' else None
+            'options': self.options,
+            'correct_answer': self.correct_answer,
+            'difficulty_level': self.difficulty_level,
+            'subject_tags': self.subject_tags,
+            'created_by': self.created_by,
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
 # Exam Result Model
@@ -155,52 +193,93 @@ def logout():
 @login_required
 def create_exam():
     if current_user.role != 'teacher':
-        flash('غير مصرح لك بإنشاء امتحانات')
+        flash('Only teachers can create exams.', 'error')
         return redirect(url_for('dashboard'))
-    
+
     if request.method == 'POST':
-        # إنشاء الاختبار
+        title = request.form.get('title')
+        description = request.form.get('description')
+        duration = request.form.get('duration')
+        
+        if not all([title, description, duration]):
+            flash('Please fill in all required fields.', 'error')
+            return redirect(url_for('create_exam'))
+        
+        try:
+            duration = int(duration)
+        except ValueError:
+            flash('Duration must be a number.', 'error')
+            return redirect(url_for('create_exam'))
+        
         exam = Exam(
-            title=request.form['title'],
-            description=request.form['description'],
-            duration=int(request.form['duration']),
-            creator_id=current_user.id,
-            is_active=True
+            title=title,
+            description=description,
+            duration=duration,
+            creator_id=current_user.id
         )
         db.session.add(exam)
-        db.session.flush()  # للحصول على exam.id
-
-        # إضافة الأسئلة
+        db.session.flush()  # Get the exam ID without committing
+        
+        # Process questions
         question_texts = request.form.getlist('question_text[]')
         question_types = request.form.getlist('question_type[]')
+        correct_answers = request.form.getlist('correct_answer[]')
         points_list = request.form.getlist('points[]')
         options_list = request.form.getlist('options[]')
-        correct_answers = request.form.getlist('correct_answer[]')
-
-        option_index = 0
+        difficulty_levels = request.form.getlist('difficulty_level[]')
+        subject_tags_list = request.form.getlist('subject_tags[]')
+        from_bank_list = request.form.getlist('from_bank[]')
+        question_ids = request.form.getlist('question_id[]')
+        
         for i in range(len(question_texts)):
-            question = Question(
-                exam_id=exam.id,
-                question_text=question_texts[i],
-                question_type=question_types[i],
-                points=int(points_list[i])
-            )
-
-            if question_types[i] in ['multiple_choice', 'true_false']:
-                if question_types[i] == 'multiple_choice':
-                    num_options = 4
-                else:
-                    num_options = 2
+            if question_texts[i].strip():  # Only add non-empty questions
+                # Check if this is a bank question
+                is_bank_question = i < len(from_bank_list) and from_bank_list[i] == 'true'
                 
-                question.options = options_list[option_index:option_index + num_options]
-                option_index += num_options
-                question.correct_answer = correct_answers[i]
-
-            db.session.add(question)
-
-        db.session.commit()
-        flash('تم إنشاء الاختبار بنجاح')
-        return redirect(url_for('dashboard'))
+                if is_bank_question and i < len(question_ids):
+                    # Copy question from bank
+                    bank_question = Question.query.get(question_ids[i])
+                    if bank_question:
+                        question = Question(
+                            exam_id=exam.id,
+                            question_text=bank_question.question_text,
+                            question_type=bank_question.question_type,
+                            correct_answer=bank_question.correct_answer,
+                            points=int(points_list[i]),  # Allow point override
+                            options=bank_question.options,
+                            difficulty_level=bank_question.difficulty_level,
+                            subject_tags=bank_question.subject_tags,
+                            created_by=current_user.id
+                        )
+                        db.session.add(question)
+                else:
+                    # Create new question
+                    options = options_list[i].split(',') if i < len(options_list) and options_list[i] else None
+                    correct_answer = correct_answers[i] if i < len(correct_answers) else ''
+                    difficulty = difficulty_levels[i] if i < len(difficulty_levels) else 'medium'
+                    subject_tags = subject_tags_list[i] if i < len(subject_tags_list) else ''
+                    
+                    question = Question(
+                        exam_id=exam.id,
+                        question_text=question_texts[i],
+                        question_type=question_types[i],
+                        correct_answer=correct_answer,
+                        points=int(points_list[i]),
+                        options=options,
+                        difficulty_level=difficulty,
+                        subject_tags=subject_tags,
+                        created_by=current_user.id
+                    )
+                    db.session.add(question)
+        
+        try:
+            db.session.commit()
+            flash('Exam created successfully!', 'success')
+            return redirect(url_for('dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while creating the exam.', 'error')
+            return redirect(url_for('create_exam'))
     
     return render_template('create_exam.html')
 
@@ -217,12 +296,69 @@ def edit_exam(exam_id):
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
-        exam.title = request.form['title']
-        exam.description = request.form['description']
-        exam.duration = int(request.form['duration'])
-        db.session.commit()
-        flash('تم تحديث الامتحان بنجاح')
-        return redirect(url_for('dashboard'))
+        try:
+            # Update exam details
+            exam.title = request.form['title']
+            exam.description = request.form['description']
+            exam.duration = int(request.form['duration'])
+            
+            # Get form data
+            question_texts = request.form.getlist('question_text[]')
+            question_types = request.form.getlist('question_type[]')
+            points = request.form.getlist('points[]')
+            difficulty_levels = request.form.getlist('difficulty_level[]')
+            subject_tags = request.form.getlist('subject_tags[]')
+            options = request.form.getlist('options[]')
+            correct_answers = request.form.getlist('correct_answer[]')
+            question_ids = request.form.getlist('question_id[]')
+            
+            # Delete existing questions that are not in the form
+            existing_question_ids = set(int(qid) for qid in question_ids if qid)
+            for question in exam.questions:
+                if question.id not in existing_question_ids:
+                    db.session.delete(question)
+            
+            # Update or create questions
+            for i in range(len(question_texts)):
+                question_id = question_ids[i] if i < len(question_ids) else None
+                
+                if question_id:
+                    # Update existing question
+                    question = Question.query.get(int(question_id))
+                    if not question:
+                        continue
+                else:
+                    # Create new question
+                    question = Question(
+                        exam_id=exam_id,
+                        created_by=current_user.id
+                    )
+                    db.session.add(question)
+                
+                # Update question fields
+                question.question_text = question_texts[i]
+                question.question_type = question_types[i]
+                question.points = int(points[i])
+                question.difficulty_level = difficulty_levels[i]
+                question.subject_tags = subject_tags[i]
+                
+                # Handle options for multiple choice questions
+                if question_types[i] == 'multiple_choice':
+                    question.options = options[i].split(',') if options[i] else []
+                else:
+                    question.options = None
+                
+                question.correct_answer = correct_answers[i]
+            
+            db.session.commit()
+            flash('تم تحديث الامتحان بنجاح')
+            return redirect(url_for('dashboard'))
+            
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error updating exam: {str(e)}")
+            flash('حدث خطأ أثناء تحديث الامتحان')
+            return render_template('edit_exam.html', exam=exam)
     
     return render_template('edit_exam.html', exam=exam)
 
@@ -304,56 +440,88 @@ def take_exam(exam_id):
 @app.route('/submit_exam/<int:exam_id>', methods=['POST'])
 @login_required
 def submit_exam(exam_id):
-    if current_user.role != 'student':
-        flash('غير مصرح لك بتسليم الامتحانات', 'error')
-        return redirect(url_for('dashboard'))
-    
-    exam = Exam.query.get_or_404(exam_id)
-    if not exam.is_active:
-        flash('هذا الامتحان غير متاح حالياً', 'error')
-        return redirect(url_for('dashboard'))
-    
-    result = ExamResult.query.filter_by(
-        student_id=current_user.id,
-        exam_id=exam_id,
-        end_time=None
-    ).first()
-    
-    if not result:
-        flash('لم يتم العثور على جلسة امتحان نشطة', 'error')
-        return redirect(url_for('dashboard'))
-    
-    total_points = 0
-    answers = []
-    
-    # تصحيح الإجابات
-    for question in exam.questions:
-        answer = request.form.get(f'answer_{question.id}')
-        is_correct = False
+    try:
+        if current_user.role != 'student':
+            flash('غير مصرح لك بتسليم الامتحانات', 'error')
+            return redirect(url_for('dashboard'))
         
-        if question.question_type in ['multiple_choice', 'true_false']:
-            is_correct = answer == question.correct_answer
-            points = question.points if is_correct else 0
-        else:  # essay
-            points = 0  # يتم تصحيح الأسئلة المقالية يدوياً
+        exam = Exam.query.get_or_404(exam_id)
+        if not exam.is_active:
+            flash('هذا الامتحان غير متاح حالياً', 'error')
+            return redirect(url_for('dashboard'))
         
-        total_points += points
-        answers.append({
-            'question_id': question.id,
-            'student_answer': answer,
-            'is_correct': is_correct,
-            'points': points
-        })
-    
-    # تحديث النتيجة
-    result.score = total_points
-    result.max_score = sum(q.points for q in exam.questions)
-    result.answers = answers
-    result.end_time = datetime.utcnow()
-    db.session.commit()
-    
-    flash(f'تم تسليم الامتحان بنجاح! النتيجة: {total_points} من {result.max_score}', 'success')
-    return redirect(url_for('dashboard'))
+        result = ExamResult.query.filter_by(
+            student_id=current_user.id,
+            exam_id=exam_id,
+            end_time=None
+        ).first()
+        
+        if not result:
+            flash('لم يتم العثور على جلسة امتحان نشطة', 'error')
+            return redirect(url_for('dashboard'))
+        
+        total_points = 0
+        answers = {}
+        
+        # تصحيح الإجابات
+        for question in exam.questions:
+            answer = request.form.get(f'answer_{question.id}')
+            if answer is None:
+                app.logger.error(f"No answer found for question {question.id}")
+                continue
+                
+            is_correct = False
+            points = 0
+            
+            if question.question_type == 'multiple_choice':
+                try:
+                    # Get the selected option text
+                    answer_index = int(answer)
+                    if question.options and 0 <= answer_index < len(question.options):
+                        student_answer = question.options[answer_index]
+                        is_correct = student_answer == question.correct_answer
+                        points = question.points if is_correct else 0
+                except (ValueError, IndexError) as e:
+                    app.logger.error(f"Error processing multiple choice answer: {str(e)}")
+                    student_answer = answer
+                    
+            elif question.question_type == 'true_false':
+                student_answer = answer
+                is_correct = answer == question.correct_answer
+                points = question.points if is_correct else 0
+                
+            else:  # essay
+                student_answer = answer
+                points = 0  # يتم تصحيح الأسئلة المقالية يدوياً
+                is_correct = None
+            
+            answers[str(question.id)] = {
+                'question_text': question.question_text,
+                'question_type': question.question_type,
+                'student_answer': student_answer,
+                'correct_answer': question.correct_answer,
+                'is_correct': is_correct,
+                'points_earned': points,
+                'points_possible': question.points
+            }
+            
+            total_points += points
+        
+        # تحديث النتيجة
+        result.score = total_points
+        result.max_score = sum(q.points for q in exam.questions)
+        result.answers = answers
+        result.end_time = datetime.utcnow()
+        db.session.commit()
+        
+        flash(f'تم تسليم الامتحان بنجاح! النتيجة: {total_points} من {result.max_score}', 'success')
+        return redirect(url_for('dashboard'))
+        
+    except Exception as e:
+        app.logger.error(f"Error in submit_exam: {str(e)}", exc_info=True)
+        db.session.rollback()
+        flash('حدث خطأ أثناء تسليم الامتحان', 'error')
+        return redirect(url_for('dashboard'))
 
 @app.route('/view_exam_results/<int:exam_id>')
 @login_required
@@ -368,6 +536,249 @@ def view_exam_results(exam_id):
         return redirect(url_for('dashboard'))
     
     return render_template('exam_results.html', exam=exam)
+
+# Question Bank Routes
+@app.route('/question-bank')
+@login_required
+def question_bank():
+    if current_user.role != 'teacher':
+        flash('Only teachers can access the question bank.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get filter parameters
+    question_type = request.args.get('type')
+    difficulty = request.args.get('difficulty')
+    topic = request.args.get('topic')
+    folder_id = request.args.get('folder_id', type=int)
+    
+    # Base query
+    query = Question.query.filter_by(created_by=current_user.id)
+    
+    # Apply filters
+    if question_type:
+        query = query.filter_by(question_type=question_type)
+    if difficulty:
+        query = query.filter_by(difficulty_level=difficulty)
+    if topic:
+        query = query.filter(Question.subject_tags.like(f'%{topic}%'))
+    if folder_id:
+        query = query.filter_by(folder_id=folder_id)
+    
+    questions = query.all()
+    folders = QuestionFolder.query.filter_by(created_by=current_user.id).all()
+    
+    return render_template('question_bank.html', 
+                         questions=questions, 
+                         folders=folders,
+                         current_folder_id=folder_id)
+
+@app.route('/question-bank/folder/create', methods=['POST'])
+@login_required
+def create_folder():
+    if current_user.role != 'teacher':
+        return jsonify({'error': 'غير مصرح لك بإنشاء مجلدات'}), 403
+    
+    try:
+        name = request.form.get('name')
+        description = request.form.get('description')
+        parent_id = request.form.get('parent_id')
+        
+        if not name:
+            return jsonify({'error': 'اسم المجلد مطلوب'}), 400
+        
+        # Convert parent_id to int or None
+        parent_id = int(parent_id) if parent_id and parent_id != 'null' else None
+        
+        folder = QuestionFolder(
+            name=name,
+            description=description,
+            parent_id=parent_id,
+            created_by=current_user.id
+        )
+        
+        db.session.add(folder)
+        db.session.commit()
+        
+        return jsonify({
+            'id': folder.id,
+            'name': folder.name,
+            'description': folder.description,
+            'parent_id': folder.parent_id
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/question-bank/question/create', methods=['POST'])
+@login_required
+def create_question():
+    if current_user.role != 'teacher':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    data = request.get_json()
+    
+    question = Question(
+        question_text=data['question_text'],
+        question_type=data['question_type'],
+        correct_answer=data['correct_answer'],
+        points=data['points'],
+        options=data.get('options'),
+        difficulty_level=data['difficulty_level'],
+        subject_tags=data['subject_tags'],
+        folder_id=data.get('folder_id'),
+        created_by=current_user.id
+    )
+    
+    db.session.add(question)
+    db.session.commit()
+    
+    return jsonify(question.to_dict())
+
+@app.route('/question-bank/question/<int:question_id>', methods=['PUT', 'DELETE'])
+@login_required
+def manage_question(question_id):
+    if current_user.role != 'teacher':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    question = Question.query.get_or_404(question_id)
+    
+    if question.created_by != current_user.id:
+        return jsonify({'error': 'You can only modify your own questions'}), 403
+    
+    if request.method == 'DELETE':
+        db.session.delete(question)
+        db.session.commit()
+        return '', 204
+    
+    data = request.get_json()
+    
+    question.question_text = data['question_text']
+    question.question_type = data['question_type']
+    question.correct_answer = data['correct_answer']
+    question.points = data['points']
+    question.options = data.get('options')
+    question.difficulty_level = data['difficulty_level']
+    question.subject_tags = data['subject_tags']
+    question.folder_id = data.get('folder_id')
+    
+    db.session.commit()
+    
+    return jsonify(question.to_dict())
+
+@app.route('/question-bank/folder/<int:folder_id>', methods=['PUT', 'DELETE'])
+@login_required
+def manage_folder(folder_id):
+    if current_user.role != 'teacher':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    folder = QuestionFolder.query.get_or_404(folder_id)
+    
+    if folder.created_by != current_user.id:
+        return jsonify({'error': 'You can only modify your own folders'}), 403
+    
+    if request.method == 'DELETE':
+        # Move questions in this folder to parent folder or root
+        Question.query.filter_by(folder_id=folder_id).update({'folder_id': folder.parent_id})
+        db.session.delete(folder)
+        db.session.commit()
+        return '', 204
+    
+    data = request.get_json()
+    
+    folder.name = data['name']
+    folder.description = data.get('description')
+    folder.parent_id = data.get('parent_id')
+    
+    db.session.commit()
+    
+    return jsonify(folder.to_dict())
+
+# Question Bank API Routes
+@app.route('/api/question_bank/folders')
+@login_required
+def get_question_folders():
+    # Get all root folders (folders with no parent)
+    folders = QuestionFolder.query
+    
+    # For non-admin users, only show folders they created or shared folders
+    if current_user.role != 'admin':
+        folders = folders.filter(
+            (QuestionFolder.created_by == current_user.id)  # Their own folders
+        )
+    
+    folders = folders.all()
+    
+    def get_folder_hierarchy(folder):
+        folder_dict = folder.to_dict()
+        folder_dict['children'] = [get_folder_hierarchy(child) for child in folder.children]
+        return folder_dict
+    
+    # Build folder hierarchy
+    folder_tree = [get_folder_hierarchy(folder) for folder in folders if folder.parent_id is None]
+    
+    return jsonify(folder_tree)
+
+@app.route('/api/question_bank/questions')
+@login_required
+def get_question_bank_questions():
+    search = request.args.get('search', '')
+    difficulty = request.args.get('difficulty', '')
+    question_type = request.args.get('type', '')
+    folder_id = request.args.get('folder_id', '')
+    
+    # Start with all questions that either have no exam_id (bank questions) or are in a folder
+    query = Question.query.filter(
+        (Question.exam_id.is_(None)) |  # Questions not in any exam
+        (Question.folder_id.isnot(None))  # Questions in folders
+    )
+    
+    # Add filters
+    if search:
+        query = query.filter(Question.question_text.ilike(f'%{search}%'))
+    if difficulty:
+        query = query.filter(Question.difficulty_level == difficulty)
+    if question_type:
+        query = query.filter(Question.question_type == question_type)
+    if folder_id:
+        query = query.filter(Question.folder_id == folder_id)
+    
+    # Get all questions visible to the current user
+    if current_user.role != 'admin':
+        # For teachers, show their own questions and shared questions
+        query = query.filter(
+            (Question.created_by == current_user.id) |  # Their own questions
+            (Question.folder_id.isnot(None))  # Questions in any folder (shared)
+        )
+    
+    questions = query.all()
+    return jsonify([{
+        'id': q.id,
+        'question_text': q.question_text,
+        'question_type': q.question_type,
+        'points': q.points,
+        'difficulty_level': q.difficulty_level,
+        'subject_tags': q.subject_tags,
+        'options': q.options,
+        'folder_id': q.folder_id
+    } for q in questions])
+
+@app.route('/api/question_bank/get_questions', methods=['POST'])
+@login_required
+def get_questions_by_ids():
+    data = request.get_json()
+    question_ids = data.get('question_ids', [])
+    
+    questions = Question.query.filter(Question.id.in_(question_ids)).all()
+    return jsonify([{
+        'id': q.id,
+        'question_text': q.question_text,
+        'question_type': q.question_type,
+        'points': q.points,
+        'difficulty_level': q.difficulty_level,
+        'subject_tags': q.subject_tags,
+        'options': q.options,
+        'correct_answer': q.correct_answer
+    } for q in questions])
 
 def create_sample_data():
     # حذف جميع البيانات الموجودة
