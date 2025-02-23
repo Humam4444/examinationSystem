@@ -7,6 +7,7 @@
             <h2 class="mb-0">{{ exam.title }}</h2>
             <p class="mb-2 mt-2">{{ exam.description }}</p>
             <div class="badge bg-light text-primary">المدة: {{ exam.duration }} دقيقة</div>
+            <div id="timer" class="badge bg-warning text-dark"></div>
         </div>
         <div class="card-body">
             <form method="POST" action="{{ url_for('submit_exam', exam_id=exam.id) }}" id="examForm">
@@ -40,7 +41,7 @@
                                 {% endif %}
                             </div>
                         {% elif question.question_type == 'true_false' %}
-                            <div class="options-container">
+                            <div class="true-false-container">
                                 <div class="form-check mb-3">
                                     <input class="form-check-input" type="radio" 
                                            name="answer_{{ question.id }}" 
@@ -60,24 +61,24 @@
                                     </label>
                                 </div>
                             </div>
-                        {% else %}
-                            <div class="form-group">
-                                <label for="answer_{{ question.id }}" class="form-label">إجابتك:</label>
+                        {% elif question.question_type == 'essay' %}
+                            <div class="essay-container">
                                 <textarea class="form-control" 
-                                          name="answer_{{ question.id }}" 
-                                          id="answer_{{ question.id }}"
-                                          rows="3" required></textarea>
+                                          name="answer_{{ question.id }}"
+                                          rows="5"
+                                          placeholder="اكتب إجابتك هنا..."
+                                          required></textarea>
                             </div>
                         {% endif %}
                     </div>
                 </div>
                 {% endfor %}
-
-                <div class="d-grid gap-2">
+                
+                <div class="text-center mt-4">
                     <button type="submit" class="btn btn-primary btn-lg">
                         <i class="fas fa-paper-plane"></i> تسليم الامتحان
                     </button>
-                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary" onclick="return confirm('هل أنت متأكد من أنك تريد إلغاء الامتحان؟')">
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-lg ms-2">
                         <i class="fas fa-times"></i> إلغاء
                     </a>
                 </div>
@@ -90,6 +91,12 @@
 .question-card {
     border: 1px solid rgba(0,0,0,.125);
     box-shadow: 0 2px 4px rgba(0,0,0,.05);
+    transition: all 0.3s ease;
+}
+
+.question-card.border-danger {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.25rem rgba(220,53,69,.25);
 }
 
 .question-text {
@@ -97,7 +104,7 @@
     color: #2c3e50;
 }
 
-.options-container {
+.options-container, .true-false-container {
     padding-right: 1rem;
 }
 
@@ -125,35 +132,49 @@
 .card-header {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
 }
 
-.alert {
-    margin-bottom: 0;
+#timer {
+    margin-right: auto;
+    font-size: 1.2rem;
+    padding: 0.5rem 1rem;
+}
+
+.essay-container textarea {
+    border: 1px solid #ced4da;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.essay-container textarea:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13,110,253,.25);
 }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Add timer functionality
-    const examDuration = parseInt("{{ exam.duration }}");
-    let timeLeft = examDuration * 60; // Convert to seconds
-    const timerDisplay = document.createElement('div');
-    timerDisplay.className = 'badge bg-warning text-dark ms-2';
-    timerDisplay.innerHTML = '<i class="fas fa-clock"></i> الوقت المتبقي: ' + examDuration + ':00';
-    document.querySelector('.card-header').appendChild(timerDisplay);
-
+    // Timer setup
+    const duration = {{ exam.duration }};
+    const startTime = new Date().getTime();
+    const endTime = startTime + (duration * 60 * 1000);
+    const timerDisplay = document.getElementById('timer');
+    
     const timer = setInterval(function() {
-        timeLeft--;
-        const minutes = Math.floor(timeLeft / 60);
-        const seconds = timeLeft % 60;
-        timerDisplay.innerHTML = '<i class="fas fa-clock"></i> الوقت المتبقي: ' + 
-            minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
-
-        if (timeLeft <= 300) { // 5 minutes remaining
+        const now = new Date().getTime();
+        const timeLeft = Math.max(0, endTime - now);
+        
+        const minutes = Math.floor(timeLeft / (1000 * 60));
+        const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+        
+        timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        
+        if (timeLeft <= 300000) { // 5 minutes remaining
             timerDisplay.classList.remove('bg-warning');
             timerDisplay.classList.add('bg-danger', 'text-white');
         }
-
+        
         if (timeLeft <= 0) {
             clearInterval(timer);
             document.getElementById('examForm').submit();

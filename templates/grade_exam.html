@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">تصحيح الامتحان: {{ exam.title }}</h2>
+    
+    {% if not submissions %}
+    <div class="alert alert-info">
+        لا يوجد إجابات مقالية تحتاج إلى تصحيح
+    </div>
+    {% else %}
+    <div class="mb-4">
+        <button id="publishResults" class="btn btn-primary" onclick="publishResults()">
+            نشر النتائج
+        </button>
+    </div>
+
+    {% for submission in submissions %}
+    <div class="card mb-4 submission-card" data-result-id="{{ submission.result.id }}">
+        <div class="card-header">
+            <h5 class="mb-0">{{ submission.student.username }}</h5>
+        </div>
+        <div class="card-body">
+            {% for q_id, essay in submission.essay_answers.items() %}
+            <div class="essay-question mb-4">
+                <h6>السؤال:</h6>
+                <p>{{ essay.question.question_text }}</p>
+                
+                <h6>إجابة الطالب:</h6>
+                <p>{{ essay.answer }}</p>
+                
+                <div class="form-group">
+                    <label>الدرجة (من {{ essay.question.points }} درجات):</label>
+                    <input type="number" 
+                           class="form-control essay-score" 
+                           data-question-id="{{ q_id }}"
+                           min="0" 
+                           max="{{ essay.question.points }}" 
+                           step="0.5"
+                           value="{{ submission.result.essay_scores[q_id] if submission.result.essay_scores else 0 }}">
+                </div>
+            </div>
+            {% endfor %}
+            
+            <button class="btn btn-success save-grades" onclick="submitGrades(this)">
+                حفظ الدرجات
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+</div>
+
+<script>
+function submitGrades(button) {
+    const card = button.closest('.submission-card');
+    const resultId = card.dataset.resultId;
+    const essayScores = {};
+    
+    card.querySelectorAll('.essay-score').forEach(input => {
+        essayScores[input.dataset.questionId] = input.value;
+    });
+    
+    fetch(`/submit_grades/{{ exam.id }}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            result_id: resultId,
+            essay_scores: essayScores
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('تم حفظ الدرجات بنجاح', 'success');
+        } else {
+            showAlert(data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showAlert('حدث خطأ أثناء حفظ الدرجات', 'error');
+    });
+}
+
+function publishResults() {
+    fetch(`/publish_results/{{ exam.id }}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('تم نشر النتائج بنجاح', 'success');
+            setTimeout(() => window.location.href = '/dashboard', 1500);
+        } else {
+            showAlert(data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showAlert('حدث خطأ أثناء نشر النتائج', 'error');
+    });
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').firstChild);
+    
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 3000);
+}
+</script>
+{% endblock %}

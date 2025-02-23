@@ -69,6 +69,36 @@
     </div>
     {% endif %}
 
+    {% if current_user.role == 'student' %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-bell"></i> الإشعارات</h5>
+                </div>
+                <div class="card-body">
+                    {% set has_notifications = false %}
+                    {% for result in current_user.exam_results %}
+                        {% if result.is_published %}
+                            {% set has_notifications = true %}
+                            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                                <strong>نتيجة جديدة!</strong> تم نشر نتيجة امتحان "{{ result.exam.title }}"
+                                <a href="{{ url_for('view_result', exam_id=result.exam_id) }}" class="btn btn-primary btn-sm ms-2">
+                                    <i class="fas fa-eye"></i> عرض النتيجة
+                                </a>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                    {% if not has_notifications %}
+                        <p class="text-muted mb-0">لا توجد إشعارات جديدة</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="row">
         <div class="col-12">
             <div class="section-header">
@@ -128,19 +158,17 @@
 
                     <div class="exam-footer">
                         {% if current_user.role == 'teacher' %}
-                        <div class="teacher-actions">
-                            <a href="{{ url_for('edit_exam', exam_id=exam.id) }}" class="action-btn edit-btn">
-                                <i class="fas fa-edit"></i>
-                                <span>تعديل</span>
-                            </a>
-                            <a href="{{ url_for('view_exam_results', exam_id=exam.id) }}" class="action-btn results-btn">
-                                <i class="fas fa-chart-bar"></i>
-                                <span>النتائج</span>
-                            </a>
-                            <button class="action-btn {% if exam.is_active %}pause-btn{% else %}play-btn{% endif %}" 
-                                    onclick="toggleExamStatus('{{ exam.id }}', {% if exam.is_active %}false{% else %}true{% endif %})">
-                                <i class="fas {% if exam.is_active %}fa-pause{% else %}fa-play{% endif %}"></i>
-                                <span>{% if exam.is_active %}إيقاف{% else %}تفعيل{% endif %}</span>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <button class="btn btn-sm btn-primary" onclick="editExam({{ exam.id }})">
+                                <i class="fas fa-edit"></i> تعديل
+                            </button>
+                            <button class="btn btn-sm btn-info" onclick="window.location.href='/grade_exam/{{ exam.id }}'">
+                                <i class="fas fa-check"></i> تصحيح
+                            </button>
+                            <button class="btn btn-sm {% if exam.is_active %}btn-danger{% else %}btn-success{% endif %}" 
+                                    onclick="toggleExam({{ exam.id }}, this)">
+                                <i class="fas {% if exam.is_active %}fa-times{% else %}fa-check{% endif %}"></i>
+                                {% if exam.is_active %}إيقاف{% else %}تفعيل{% endif %}
                             </button>
                         </div>
                         {% else %}
@@ -189,13 +217,13 @@
 </div>
 
 <script>
-function toggleExamStatus(examId, status) {
+function toggleExam(examId, button) {
     fetch(`/toggle_exam/${examId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ status: status })
+        body: JSON.stringify({ status: !button.classList.contains('btn-danger') })
     })
     .then(response => response.json())
     .then(data => {

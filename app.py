@@ -117,6 +117,10 @@ class ExamResult(db.Model):
     answers = db.Column(db.PickleType)
     start_time = db.Column(db.DateTime, default=datetime.utcnow)
     end_time = db.Column(db.DateTime)
+    is_graded = db.Column(db.Boolean, default=False)
+    is_published = db.Column(db.Boolean, default=False)
+    auto_graded_score = db.Column(db.Float)  # Score from auto-graded questions
+    essay_score = db.Column(db.Float)  # Score from manually graded essay questions
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -432,95 +436,90 @@ def take_exam(exam_id):
         return render_template('take_exam.html', exam=exam)
         
     except Exception as e:
-        app.logger.error(f"Error in take_exam: {str(e)}", exc_info=True)
         db.session.rollback()
+        app.logger.error(f"Error in take_exam: {str(e)}", exc_info=True)
         flash('حدث خطأ أثناء تحميل الامتحان', 'error')
         return redirect(url_for('dashboard'))
 
 @app.route('/submit_exam/<int:exam_id>', methods=['POST'])
 @login_required
 def submit_exam(exam_id):
+    if current_user.role != 'student':
+        return jsonify({'error': 'غير مصرح لك بتقديم الامتحانات'}), 403
+    
     try:
-        if current_user.role != 'student':
-            flash('غير مصرح لك بتسليم الامتحانات', 'error')
-            return redirect(url_for('dashboard'))
-        
         exam = Exam.query.get_or_404(exam_id)
         if not exam.is_active:
-            flash('هذا الامتحان غير متاح حالياً', 'error')
-            return redirect(url_for('dashboard'))
+            return jsonify({'error': 'هذا الامتحان غير متاح حالياً'}), 400
         
+        # Get student's answers from form data
+        answers = {}
+        for question in exam.questions:
+            answer_key = f'answer_{question.id}'
+            if question.question_type == 'multiple_choice':
+                answer = request.form.get(answer_key)
+                if answer is not None:
+                    # Convert the option index to the actual option text
+                    try:
+                        answer_index = int(answer)
+                        if question.options and 0 <= answer_index < len(question.options):
+                            answers[str(question.id)] = question.options[answer_index]
+                    except (ValueError, IndexError):
+                        pass
+            elif question.question_type == 'true_false':
+                answer = request.form.get(answer_key)
+                if answer:
+                    answers[str(question.id)] = answer
+            elif question.question_type == 'essay':
+                answer = request.form.get(answer_key)
+                if answer:
+                    answers[str(question.id)] = answer.strip()
+        
+        # Get exam result
         result = ExamResult.query.filter_by(
-            student_id=current_user.id,
             exam_id=exam_id,
-            end_time=None
+            student_id=current_user.id
         ).first()
         
         if not result:
-            flash('لم يتم العثور على جلسة امتحان نشطة', 'error')
-            return redirect(url_for('dashboard'))
+            return jsonify({'error': 'لم يتم العثور على نتيجة الامتحان'}), 404
         
-        total_points = 0
-        answers = {}
-        
-        # تصحيح الإجابات
-        for question in exam.questions:
-            answer = request.form.get(f'answer_{question.id}')
-            if answer is None:
-                app.logger.error(f"No answer found for question {question.id}")
-                continue
-                
-            is_correct = False
-            points = 0
-            
-            if question.question_type == 'multiple_choice':
-                try:
-                    # Get the selected option text
-                    answer_index = int(answer)
-                    if question.options and 0 <= answer_index < len(question.options):
-                        student_answer = question.options[answer_index]
-                        is_correct = student_answer == question.correct_answer
-                        points = question.points if is_correct else 0
-                except (ValueError, IndexError) as e:
-                    app.logger.error(f"Error processing multiple choice answer: {str(e)}")
-                    student_answer = answer
-                    
-            elif question.question_type == 'true_false':
-                student_answer = answer
-                is_correct = answer == question.correct_answer
-                points = question.points if is_correct else 0
-                
-            else:  # essay
-                student_answer = answer
-                points = 0  # يتم تصحيح الأسئلة المقالية يدوياً
-                is_correct = None
-            
-            answers[str(question.id)] = {
-                'question_text': question.question_text,
-                'question_type': question.question_type,
-                'student_answer': student_answer,
-                'correct_answer': question.correct_answer,
-                'is_correct': is_correct,
-                'points_earned': points,
-                'points_possible': question.points
-            }
-            
-            total_points += points
-        
-        # تحديث النتيجة
-        result.score = total_points
-        result.max_score = sum(q.points for q in exam.questions)
+        # Save answers
         result.answers = answers
         result.end_time = datetime.utcnow()
+        
+        # Calculate score for non-essay questions
+        auto_graded_score = 0
+        max_score = 0
+        
+        for question in exam.questions:
+            max_score += question.points
+            if question.question_type != 'essay':
+                answer = answers.get(str(question.id))
+                if answer:
+                    if question.question_type == 'multiple_choice':
+                        if answer == question.correct_answer:
+                            auto_graded_score += question.points
+                    elif question.question_type == 'true_false':
+                        if answer.lower() == question.correct_answer.lower():
+                            auto_graded_score += question.points
+        
+        result.auto_graded_score = auto_graded_score
+        result.essay_score = 0  # Initialize essay score
+        result.max_score = max_score
+        result.score = auto_graded_score  # Initial score from auto-graded questions
+        result.is_graded = False  # Reset grading status
+        result.is_published = False  # Reset publishing status
+        
         db.session.commit()
         
-        flash(f'تم تسليم الامتحان بنجاح! النتيجة: {total_points} من {result.max_score}', 'success')
+        flash('تم تقديم الامتحان بنجاح', 'success')
         return redirect(url_for('dashboard'))
         
     except Exception as e:
-        app.logger.error(f"Error in submit_exam: {str(e)}", exc_info=True)
         db.session.rollback()
-        flash('حدث خطأ أثناء تسليم الامتحان', 'error')
+        app.logger.error(f"Error in submit_exam: {str(e)}", exc_info=True)
+        flash('حدث خطأ أثناء تقديم الامتحان', 'error')
         return redirect(url_for('dashboard'))
 
 @app.route('/view_exam_results/<int:exam_id>')
@@ -780,87 +779,210 @@ def get_questions_by_ids():
         'correct_answer': q.correct_answer
     } for q in questions])
 
+@app.route('/grade_exam/<int:exam_id>')
+@login_required
+def grade_exam(exam_id):
+    if current_user.role != 'teacher':
+        flash('غير مصرح لك بتصحيح الامتحانات', 'error')
+        return redirect(url_for('dashboard'))
+    
+    exam = Exam.query.get_or_404(exam_id)
+    if exam.creator_id != current_user.id:
+        flash('غير مصرح لك بتصحيح هذا الامتحان', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get all submissions for this exam that have essay questions
+    results = ExamResult.query.filter_by(exam_id=exam_id).all()
+    submissions = []
+    
+    for result in results:
+        has_essay = False
+        essay_answers = {}
+        
+        # Check if submission has essay questions
+        for q_id, answer in result.answers.items():
+            question = Question.query.get(int(q_id))
+            if question and question.question_type == 'essay':
+                has_essay = True
+                essay_answers[q_id] = {
+                    'question': question,
+                    'answer': answer
+                }
+        
+        if has_essay:
+            student = User.query.get(result.student_id)
+            submissions.append({
+                'result': result,
+                'student': student,
+                'essay_answers': essay_answers
+            })
+    
+    return render_template('grade_exam.html', exam=exam, submissions=submissions)
+
+@app.route('/submit_grades/<int:exam_id>', methods=['POST'])
+@login_required
+def submit_grades(exam_id):
+    if current_user.role != 'teacher':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    exam = Exam.query.get_or_404(exam_id)
+    if exam.creator_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        data = request.get_json()
+        result_id = data.get('result_id')
+        essay_scores = data.get('essay_scores', {})
+        
+        result = ExamResult.query.get_or_404(result_id)
+        
+        # Calculate total essay score
+        total_essay_score = sum(float(score) for score in essay_scores.values())
+        
+        # Update result
+        result.essay_score = total_essay_score
+        result.score = result.auto_graded_score + total_essay_score
+        result.is_graded = True
+        
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/publish_results/<int:exam_id>', methods=['POST'])
+@login_required
+def publish_results(exam_id):
+    if current_user.role != 'teacher':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    exam = Exam.query.get_or_404(exam_id)
+    if exam.creator_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        # Check if all submissions with essay questions are graded
+        results = ExamResult.query.filter_by(exam_id=exam_id).all()
+        for result in results:
+            has_essay = any(
+                Question.query.get(int(q_id)).question_type == 'essay'
+                for q_id in result.answers.keys()
+            )
+            if has_essay and not result.is_graded:
+                return jsonify({
+                    'error': 'يجب تصحيح جميع الأسئلة المقالية قبل نشر النتائج'
+                }), 400
+        
+        # Publish all results
+        for result in results:
+            result.is_published = True
+        
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/view_result/<int:exam_id>')
+@login_required
+def view_result(exam_id):
+    if current_user.role != 'student':
+        flash('غير مصرح لك بعرض نتائج الامتحانات', 'error')
+        return redirect(url_for('dashboard'))
+    
+    result = ExamResult.query.filter_by(
+        exam_id=exam_id,
+        student_id=current_user.id
+    ).first_or_404()
+    
+    if not result.is_published:
+        flash('لم يتم نشر نتائج هذا الامتحان بعد', 'warning')
+        return redirect(url_for('dashboard'))
+    
+    return render_template('view_result.html', result=result)
+
 def create_sample_data():
-    # حذف جميع البيانات الموجودة
+    # Delete all existing data
     ExamResult.query.delete()
     Question.query.delete()
     Exam.query.delete()
     User.query.delete()
-    db.session.commit()
     
-    # إنشاء حساب معلم افتراضي
-    teacher = User(
-        username='teacher',
-        email='teacher@example.com',
-        role='teacher'
-    )
+    # Create test users
+    teacher = User(username='teacher1', email='teacher1@example.com', role='teacher')
     teacher.set_password('password123')
-    db.session.add(teacher)
     
-    # إنشاء حساب طالب افتراضي
-    student = User(
-        username='student',
-        email='student@example.com',
-        role='student'
-    )
+    student = User(username='student1', email='student1@example.com', role='student')
     student.set_password('password123')
-    db.session.add(student)
+    
+    db.session.add_all([teacher, student])
     db.session.commit()
     
-    # إنشاء امتحان رياضيات نموذجي
-    math_exam = Exam(
-        title='امتحان الرياضيات',
-        description='امتحان شامل في الرياضيات يغطي الجبر والهندسة وحساب المثلثات',
+    # Create a test exam
+    exam = Exam(
+        title='اختبار تجريبي',
+        description='هذا اختبار تجريبي يغطي الجبر والهندسة وحساب المثلثات',
         duration=60,
         creator_id=teacher.id,
         is_active=True
     )
-    db.session.add(math_exam)
-    db.session.flush()
-    
-    # إضافة أسئلة متنوعة
-    questions = [
-        {
-            'text': 'ما هو ناتج 5 × 7 ؟',
-            'type': 'multiple_choice',
-            'options': ['25', '35', '40', '45'],
-            'correct': '35',
-            'points': 2
-        },
-        {
-            'text': 'هل المثلث المتساوي الأضلاع جميع زواياه 60 درجة؟',
-            'type': 'true_false',
-            'correct': 'صح',
-            'points': 1
-        },
-        {
-            'text': 'احسب مساحة مثلث طول قاعدته 6 سم وارتفاعه 8 سم.',
-            'type': 'multiple_choice',
-            'options': ['24 سم²', '48 سم²', '12 سم²', '36 سم²'],
-            'correct': '24 سم²',
-            'points': 2
-        },
-        {
-            'text': 'اشرح كيفية حل المعادلة التربيعية: x² + 5x + 6 = 0',
-            'type': 'essay',
-            'correct': '',
-            'points': 5
-        }
-    ]
-    
-    for q in questions:
-        question = Question(
-            exam_id=math_exam.id,
-            question_text=q['text'],
-            question_type=q['type'],
-            correct_answer=q['correct'],
-            points=q['points']
-        )
-        if q['type'] == 'multiple_choice':
-            question.options = q['options']
-        db.session.add(question)
-    
+    db.session.add(exam)
     db.session.commit()
+    
+    # Create test questions
+    questions = [
+        Question(
+            exam_id=exam.id,
+            question_text='ما هي عاصمة المملكة العربية السعودية؟',
+            question_type='multiple_choice',
+            options=['الرياض', 'جدة', 'مكة', 'المدينة'],
+            correct_answer='الرياض',
+            points=2,
+            created_by=teacher.id
+        ),
+        Question(
+            exam_id=exam.id,
+            question_text='هل اللغة العربية هي أكثر اللغات السامية المتحدث بها؟',
+            question_type='true_false',
+            correct_answer='true',
+            points=1,
+            created_by=teacher.id
+        ),
+        Question(
+            exam_id=exam.id,
+            question_text='اشرح أهمية اللغة العربية في الحضارة الإسلامية',
+            question_type='essay',
+            correct_answer='',
+            points=5,
+            created_by=teacher.id
+        )
+    ]
+    db.session.add_all(questions)
+    db.session.commit()
+    
+    # Create a test result
+    result = ExamResult(
+        exam_id=exam.id,
+        student_id=student.id,
+        score=7.0,
+        max_score=8.0,
+        answers={
+            '1': 'الرياض',
+            '2': 'true',
+            '3': 'اللغة العربية لها أهمية كبيرة في الحضارة الإسلامية لأنها لغة القرآن الكريم...'
+        },
+        start_time=datetime.utcnow(),
+        end_time=datetime.utcnow(),
+        is_graded=True,
+        is_published=True,
+        auto_graded_score=3.0,
+        essay_score=4.0
+    )
+    db.session.add(result)
+    db.session.commit()
+    
+    print("Sample data created successfully!")
 
 if __name__ == '__main__':
     # Ensure instance folder exists

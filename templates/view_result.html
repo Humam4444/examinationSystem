@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card result-card">
+        <div class="card-header">
+            <h2 class="mb-0">نتيجة امتحان {{ result.exam.title }}</h2>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="score-summary mb-4">
+                        <h4 class="text-white mb-3">ملخص النتيجة</h4>
+                        <div class="table-responsive">
+                            <table class="table table-bordered custom-table">
+                                <tbody>
+                                    <tr>
+                                        <th>الدرجة الكلية</th>
+                                        <td>{{ "%.2f"|format(result.score) }} من {{ "%.2f"|format(result.max_score) }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>النسبة المئوية</th>
+                                        <td>{{ "%.1f"|format((result.score / result.max_score * 100)) }}%</td>
+                                    </tr>
+                                    <tr>
+                                        <th>درجة الأسئلة الموضوعية</th>
+                                        <td>{{ "%.2f"|format(result.auto_graded_score) }}</td>
+                                    </tr>
+                                    {% if result.essay_score is not none %}
+                                    <tr>
+                                        <th>درجة الأسئلة المقالية</th>
+                                        <td>{{ "%.2f"|format(result.essay_score) }}</td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="exam-info mb-4">
+                        <h4 class="text-white mb-3">معلومات الامتحان</h4>
+                        <ul class="list-group">
+                            <li class="list-group-item info-item">
+                                تاريخ البدء
+                                <span>{{ result.start_time.strftime('%Y-%m-%d %H:%M') }}</span>
+                            </li>
+                            <li class="list-group-item info-item">
+                                تاريخ الانتهاء
+                                <span>{{ result.end_time.strftime('%Y-%m-%d %H:%M') }}</span>
+                            </li>
+                            <li class="list-group-item info-item">
+                                المدة المستغرقة
+                                <span>{{ ((result.end_time - result.start_time).total_seconds() / 60)|round|int }} دقيقة</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="answers-review mt-4">
+                <h4 class="text-white mb-3">مراجعة الإجابات</h4>
+                {% for question in result.exam.questions %}
+                <div class="card question-card mb-3">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">السؤال {{ loop.index }}</h5>
+                            <span class="badge bg-info">{{ question.points }} درجة</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="question-text mb-3">{{ question.question_text }}</p>
+                        
+                        <div class="answer-details">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6 class="text-muted">إجابتك:</h6>
+                                    <p class="student-answer">
+                                        {% set answer = result.answers.get(question.id|string, '') %}
+                                        {% if question.question_type == 'essay' %}
+                                            <div class="essay-answer">{{ answer }}</div>
+                                        {% else %}
+                                            {{ answer }}
+                                        {% endif %}
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    {% if question.question_type != 'essay' %}
+                                        <h6 class="text-muted">الإجابة الصحيحة:</h6>
+                                        <p class="correct-answer">{{ question.correct_answer }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="text-center mt-4">
+                <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-arrow-left"></i> العودة للوحة التحكم
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.result-card {
+    background: linear-gradient(135deg, #1e2a3a 0%, #2c3e50 100%);
+    color: white;
+    border-radius: 15px;
+    overflow: hidden;
+    transition: transform 0.3s, box-shadow 0.3s;
+    border: none;
+}
+
+.result-card .card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-bottom: none;
+    padding: 1.5rem;
+}
+
+.score-summary {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    color: #ffffff;
+}
+
+.info-item {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: none;
+    margin-bottom: 0.5rem;
+    border-radius: 10px !important;
+    transition: transform 0.3s ease;
+}
+
+.question-card {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    color: white;
+}
+
+.question-card .card-header {
+    background: rgba(255, 255, 255, 0.15);
+    border-bottom: none;
+}
+
+.question-text {
+    font-size: 1.1rem;
+    color: #ffffff;
+    padding: 1rem 0;
+}
+
+.student-answer, .correct-answer {
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    margin-bottom: 0;
+    color: #ffffff;
+}
+
+.essay-answer {
+    white-space: pre-wrap;
+}
+
+.badge {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
+    background: #667eea;
+    border: none;
+}
+
+.custom-table {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.custom-table th,
+.custom-table td {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    padding: 0.8rem 2rem;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+</style>
+{% endblock %}
