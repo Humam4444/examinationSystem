@@ -6,18 +6,37 @@ from datetime import datetime
 import os
 import logging
 from sqlalchemy.types import PickleType
+from dotenv import load_dotenv
+
+# Load environment variables from .env file if it exists
+load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.urandom(24)
+
+# Security configuration
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(24))
 
 # Database configuration
-basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'exam_system.db')
+if os.environ.get('DATABASE_URL'):
+    # Use PostgreSQL in production (Render)
+    db_url = os.environ.get('DATABASE_URL')
+    if db_url.startswith('postgres://'):
+        db_url = db_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+else:
+    # Use SQLite in development
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'exam_system.db')
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Initialize extensions
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+
+# Ensure the instance folder exists
+os.makedirs(os.path.join(basedir, 'instance'), exist_ok=True)
 
 # User Model
 class User(UserMixin, db.Model):
