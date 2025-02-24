@@ -1,0 +1,208 @@
+.custom-editor {
+    min-height: 200px;
+    max-height: 500px;
+    padding: 1rem;
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    overflow-y: auto;
+    direction: rtl;
+    text-align: right;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-word;
+}
+
+.custom-editor:focus {
+    color: #212529;
+    background-color: #fff;
+    border-color: #86b7fe;
+    outline: 0;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.editor-toolbar {
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+    border: 1px solid #ced4da;
+    border-bottom: none;
+    border-radius: 0.25rem 0.25rem 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.editor-toolbar button {
+    min-width: 2.5rem;
+    height: 2rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    border-radius: 0.2rem;
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    color: #6c757d;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease-in-out;
+}
+
+.editor-toolbar button:hover {
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+    color: #495057;
+}
+
+.editor-toolbar button:active {
+    background-color: #dde0e3;
+    border-color: #adb5bd;
+    color: #495057;
+}
+
+.editor-toolbar button.active {
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+    color: #495057;
+}
+
+/* Style for text alignment */
+.custom-editor[style*="text-align: left"] { direction: ltr; }
+.custom-editor[style*="text-align: right"] { direction: rtl; }
+
+/* Style for lists */
+.custom-editor ul, 
+.custom-editor ol {
+    padding-right: 2rem;
+    padding-left: 0;
+}
+
+/* Style for content */
+.custom-editor p {
+    margin: 0;
+    min-height: 1.5em;
+    padding: 0.25rem 0;
+}
+
+.custom-editor blockquote {
+    border-right: 3px solid #ced4da;
+    margin: 0 1rem 1rem 0;
+    padding: 0.5rem 1rem;
+    color: #6c757d;
+}
+
+/* Placeholder style */
+.custom-editor:empty:before {
+    content: 'اكتب سؤالك هنا...';
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* Equation styles */
+.equation-wrapper {
+    margin: 0.5rem 0;
+    padding: 0.25rem;
+    background-color: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 0.25rem;
+    text-align: center;
+    position: relative;
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+}
+
+.equation-source {
+    display: none;
+    width: 100%;
+    min-height: 1.5em;
+    padding: 0.25rem;
+    font-family: monospace;
+    white-space: pre-wrap;
+    text-align: left;
+    direction: ltr;
+    background: #f8f9fa;
+    border: none;
+}
+
+.equation-source:focus {
+    outline: none;
+    background: #fff;
+    border-bottom: 2px solid #007bff;
+}
+
+.latex-equation,
+.chemistry-equation {
+    display: block;
+    overflow-x: auto;
+    padding: 0.25rem;
+    color: #212529;
+    background-color: #fff;
+    min-height: 1.5em;
+}
+
+.equation-wrapper:hover,
+.equation-wrapper:focus-within {
+    border-color: #dee2e6;
+    background-color: #fff;
+}
+
+.equation-wrapper + br + :not(.equation-wrapper) {
+    margin-top: 0.5rem;
+}
+
+.equation-wrapper:hover::after {
+    content: '✎';
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    font-size: 0.875em;
+    color: #6c757d;
+    opacity: 0.4;
+}
+
+.katex-display {
+    margin: 0 !important;
+}
+
+.katex {
+    text-align: center !important;
+    color: #212529 !important;
+}
+
+/* Override any KaTeX default colors */
+.katex .mord,
+.katex .mbin,
+.katex .mrel,
+.katex .mopen,
+.katex .mclose,
+.katex .mpunct,
+.katex .minner {
+    color: #212529 !important;
+}
+
+/* Make equations non-editable but selectable */
+.equation-wrapper {
+    cursor: pointer;
+    user-select: all;
+}
+
+/* Ensure chemical formulas are visible */
+.katex .mhchem {
+    color: #212529 !important;
+}
+
+/* Toolbar button groups */
+.editor-toolbar .btn-group {
+    margin-right: 0.25rem;
+}
+
+.editor-toolbar button[title^="معادلة"] {
+    background-color: #f0f8ff;
+}
+
+.editor-toolbar button[title^="معادلة"]:hover {
+    background-color: #e6f3ff;
+}

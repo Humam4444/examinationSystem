@@ -614,24 +614,36 @@ def create_question():
     if current_user.role != 'teacher':
         return jsonify({'error': 'Unauthorized'}), 403
     
-    data = request.get_json()
-    
-    question = Question(
-        question_text=data['question_text'],
-        question_type=data['question_type'],
-        correct_answer=data['correct_answer'],
-        points=data['points'],
-        options=data.get('options'),
-        difficulty_level=data['difficulty_level'],
-        subject_tags=data['subject_tags'],
-        folder_id=data.get('folder_id'),
-        created_by=current_user.id
-    )
-    
-    db.session.add(question)
-    db.session.commit()
-    
-    return jsonify(question.to_dict())
+    try:
+        data = request.get_json()
+        
+        # Create new question
+        question = Question(
+            question_text=data.get('text', ''),  # Get text from the editor
+            question_type=data.get('type', 'multiple_choice'),
+            correct_answer=data.get('correct_answer', ''),
+            points=int(data.get('points', 1)),
+            options=data.get('options', []),
+            difficulty_level=data.get('difficulty_level', 'medium'),
+            subject_tags=data.get('subject_tags', ''),
+            folder_id=data.get('folder_id'),
+            created_by=current_user.id
+        )
+        
+        db.session.add(question)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'question': question.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error creating question: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Failed to create question'
+        }), 500
 
 @app.route('/question-bank/question/<int:question_id>', methods=['PUT', 'DELETE'])
 @login_required
@@ -645,24 +657,44 @@ def manage_question(question_id):
         return jsonify({'error': 'You can only modify your own questions'}), 403
     
     if request.method == 'DELETE':
-        db.session.delete(question)
+        try:
+            db.session.delete(question)
+            db.session.commit()
+            return jsonify({'success': True})
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error deleting question: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to delete question'
+            }), 500
+    
+    try:
+        data = request.get_json()
+        
+        # Update question fields
+        question.question_text = data.get('text', question.question_text)
+        question.question_type = data.get('type', question.question_type)
+        question.correct_answer = data.get('correct_answer', question.correct_answer)
+        question.points = int(data.get('points', question.points))
+        question.options = data.get('options', question.options)
+        question.difficulty_level = data.get('difficulty_level', question.difficulty_level)
+        question.subject_tags = data.get('subject_tags', question.subject_tags)
+        question.folder_id = data.get('folder_id', question.folder_id)
+        
         db.session.commit()
-        return '', 204
-    
-    data = request.get_json()
-    
-    question.question_text = data['question_text']
-    question.question_type = data['question_type']
-    question.correct_answer = data['correct_answer']
-    question.points = data['points']
-    question.options = data.get('options')
-    question.difficulty_level = data['difficulty_level']
-    question.subject_tags = data['subject_tags']
-    question.folder_id = data.get('folder_id')
-    
-    db.session.commit()
-    
-    return jsonify(question.to_dict())
+        
+        return jsonify({
+            'success': True,
+            'question': question.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error updating question: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Failed to update question'
+        }), 500
 
 @app.route('/question-bank/folder/<int:folder_id>', methods=['PUT', 'DELETE'])
 @login_required
