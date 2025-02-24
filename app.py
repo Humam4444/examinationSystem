@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 # Load environment variables from .env file if it exists
 load_dotenv()
 
+# Get the base directory
+basedir = os.path.abspath(os.path.dirname(__file__))
+
 app = Flask(__name__)
 
 # Security configuration
@@ -25,8 +28,10 @@ if os.environ.get('DATABASE_URL'):
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 else:
     # Use SQLite in development
-    basedir = os.path.abspath(os.path.dirname(__file__))
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'exam_system.db')
+
+# Ensure the instance folder exists
+os.makedirs(os.path.join(basedir, 'instance'), exist_ok=True)
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -34,9 +39,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-
-# Ensure the instance folder exists
-os.makedirs(os.path.join(basedir, 'instance'), exist_ok=True)
 
 # User Model
 class User(UserMixin, db.Model):
