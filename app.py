@@ -37,33 +37,36 @@ db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# Create tables and sample data on Render
-@app.before_first_request
-def create_tables():
-    db.create_all()
-    if os.environ.get('RENDER'):
-        # Check if we need to create sample data
-        if User.query.first() is None:
-            # Create admin user
-            admin = User(username='admin', email='admin@example.com', role='admin')
-            admin.set_password('admin123')
-            db.session.add(admin)
-            
-            # Create a teacher
-            teacher = User(username='teacher', email='teacher@example.com', role='teacher')
-            teacher.set_password('teacher123')
-            db.session.add(teacher)
-            
-            # Create a student
-            student = User(username='student', email='student@example.com', role='student')
-            student.set_password('student123')
-            db.session.add(student)
-            
-            try:
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                app.logger.error(f"Error creating sample data: {str(e)}")
+# Database initialization
+def init_db():
+    with app.app_context():
+        db.create_all()
+        if os.environ.get('RENDER'):
+            # Check if we need to create sample data
+            if User.query.first() is None:
+                # Create admin user
+                admin = User(username='admin', email='admin@example.com', role='admin')
+                admin.set_password('admin123')
+                db.session.add(admin)
+                
+                # Create a teacher
+                teacher = User(username='teacher', email='teacher@example.com', role='teacher')
+                teacher.set_password('teacher123')
+                db.session.add(teacher)
+                
+                # Create a student
+                student = User(username='student', email='student@example.com', role='student')
+                student.set_password('student123')
+                db.session.add(student)
+                
+                try:
+                    db.session.commit()
+                except Exception as e:
+                    db.session.rollback()
+                    app.logger.error(f"Error creating sample data: {str(e)}")
+
+# Initialize database
+init_db()
 
 # User Model
 class User(UserMixin, db.Model):
