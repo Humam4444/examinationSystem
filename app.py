@@ -20,18 +20,15 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(24))
 
 # Database configuration
-if os.environ.get('DATABASE_URL'):
-    # Use PostgreSQL in production (Render)
-    db_url = os.environ.get('DATABASE_URL')
-    if db_url.startswith('postgres://'):
-        db_url = db_url.replace('postgres://', 'postgresql://', 1)
-    app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+if os.environ.get('RENDER'):
+    # Use SQLite in /tmp directory on Render
+    db_path = '/tmp/exam_system.db'
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 else:
     # Use SQLite in development
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'exam_system.db')
-
-# Ensure the instance folder exists
-os.makedirs(os.path.join(basedir, 'instance'), exist_ok=True)
+    db_path = os.path.join(basedir, 'instance', 'exam_system.db')
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
